@@ -1,0 +1,56 @@
+%\documentclass[proposal]{thesis} % use for a thesis proposal
+\documentclass{thesis}
+
+\usepackage{lipsum}
+
+\subject{Bachelor's Thesis}
+\title{Title}
+\subtitle{Subtitle}
+\author{Tom Groenwoldt}
+\date{Date}
+\location{Hamburg}
+\supervisors{
+Supervisor 1\\ Institute for Data Engineering\\ TU Hamburg
+\and
+Supervisor 2\\ Institute for Data Engineering\\ TU Hamburg
+}
+\dedication{to the reader}
+
+\addbibresource{references.bib}
+
+\begin{document}
+\frontmatter
+
+\maketitle
+
+\tableofcontents
+
+
+\begin{abstract}
+\lipsum[1-2]
+\end{abstract}
+
+\begin{preface}{Preface}
+\lipsum[3-5]
+\end{preface}
+
+\begin{preface}{Acknowledgement}
+\lipsum[6]
+\end{preface}
+
+
+\mainmatter
+
+
+\chapter{Introduction}
+
+\lipsum[7-20]
+
+\backmatter
+\printbibliography
+\listoffigures
+\listoftables
+
+\insertdeclaration
+
+\end{document}
