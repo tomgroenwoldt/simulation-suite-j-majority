@@ -1,0 +1,11 @@
+[package]
+name = "simulation_cli"
+description = "Simulation CLI tool for my bachelor thesis"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tom Groenwoldt <tom.groenwoldt@tuhh.de>"]
+
+[dependencies]
+clap = { version = "4.2.2", features = ["derive"] }
+rand = "0.8.5"
+rstest = "0.17.0"
