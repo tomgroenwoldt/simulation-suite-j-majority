@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct Agent {
-    opinion: u8,
+    pub opinion: u8,
 }
 
 impl Agent {
@@ -44,6 +44,12 @@ mod agent {
     use super::*;
     use rand::Rng;
     use rstest::rstest;
+
+    #[rstest]
+    fn can_create() {
+        let agent = Agent::new(0);
+        assert_eq!(agent.opinion, 0);
+    }
 
     #[rstest]
     #[case(10, 5)]
