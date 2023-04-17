@@ -30,5 +30,36 @@ impl Simulation {
             ..Simulation::default()
         }
     }
+    /// Checks whether all agents hold the same opinion.
+    pub fn reached_consensus(&self) -> bool {
+        if let Some(first_agent) = self.agents.first() {
+            let first_opinion = first_agent.opinion;
+            self.agents
+                .iter()
+                .all(|agent| first_opinion.eq(&agent.opinion))
+        } else {
+            // If the simulation has no agents, we instantly reach consensus.
+            true
+        }
+    }
     // TODO: Add constructor methods supporting a bias.
+}
+
+#[cfg(test)]
+mod simulation {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(0)]
+    #[case(1)]
+    fn achieve_consensus_with_at_most_one_agent(#[case] agent_count: u64) {
+        let config = Config {
+            agent_count,
+            sample_size: 5,
+            opinion_count: 5,
+        };
+        let simulation_without_agents = Simulation::new(config);
+        assert!(simulation_without_agents.reached_consensus());
+    }
 }
