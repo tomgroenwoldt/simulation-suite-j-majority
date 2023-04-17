@@ -1,3 +1,4 @@
+[![codecov](https://codecov.io/gh/tomgroenwoldt/bachelor-thesis/branch/main/graph/badge.svg?token=FE4062QVEN)](https://codecov.io/gh/tomgroenwoldt/bachelor-thesis)
 # Simulation of Distributed Majority Protocols
 This repository contains my bachelor thesis written in LaTeX and the used simulation software.
 
