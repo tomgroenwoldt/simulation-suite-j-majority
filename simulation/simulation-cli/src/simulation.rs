@@ -1,7 +1,7 @@
 use rand::{seq::SliceRandom, Rng};
 use std::collections::HashMap;
 
-use crate::{agent::Agent, Config};
+use crate::{agent::Agent, error::AppError, Config};
 
 #[derive(Debug, Default)]
 pub struct OpinionDistribution {
@@ -63,21 +63,20 @@ impl Simulation {
 
     /// Starts the simulation loop and exits if all agents agree on the
     /// same opinion.
-    pub fn execute(&mut self) {
+    pub fn execute(&mut self) -> Result<(), AppError> {
         // Return on a single opinion, as consensus is already reached.
         if self.k.eq(&1) {
-            return;
+            return Ok(());
         }
         // TODO: Add this as state.
         let mut exit = false;
 
         while !exit {
-            let (chosen_agent, sample) = Simulation::prepare_interaction(&mut self.agents, self.j);
+            let (chosen_agent, sample) = Simulation::prepare_interaction(&mut self.agents, self.j)?;
             let old_opinion = chosen_agent.opinion;
 
-            let new_opinion = chosen_agent
-                .update(&sample, &mut self.interaction_count)
-                .unwrap();
+            // Update agent opinion and set new opinion distribution.
+            let new_opinion = chosen_agent.update(&sample, &mut self.interaction_count)?;
             let updated_opinion_count = self
                 .opinion_distribution
                 .update(Some(old_opinion), new_opinion);
@@ -87,6 +86,7 @@ impl Simulation {
                 exit = true;
             }
         }
+        Ok(())
     }
 
     /// Chooses and returns a agent uniformly at random as well as a sample of
@@ -94,24 +94,26 @@ impl Simulation {
     pub fn prepare_interaction(
         agents: &mut Vec<Agent>,
         sample_size: u8,
-    ) -> (&mut Agent, Vec<Agent>) {
+    ) -> Result<(&mut Agent, Vec<Agent>), AppError> {
         let mut rng = rand::thread_rng();
         let n = agents.len();
+        if n.eq(&0) {
+            return Err(AppError::EmptyAgents);
+        }
         // Swap a random agent to the first position. This way we can always
         // split the vector via `.split_first_mut()` to work via references.
         agents.swap(0, rng.gen_range(0..n));
 
-        // We can safely unwrap here, because we don't remove agents.
+        // We can safely unwrap here, because we already checked if agents
+        // is empty.
         let (chosen_agent, remaining) = agents.split_first_mut().unwrap();
-
         // Randomly choose j agents out of remaining vector.
-        // Update opinion distribution and agent.
         let sample = remaining
             .choose_multiple(&mut rng, sample_size as usize)
             .cloned()
             .collect::<Vec<_>>();
 
-        (chosen_agent, sample)
+        Ok((chosen_agent, sample))
     }
 }
 
@@ -140,7 +142,7 @@ mod simulation {
     }
 
     #[rstest]
-    fn single_opinion_leads_to_exit() {
+    fn single_opinion_leads_to_exit() -> Result<(), AppError> {
         let config = Config {
             agent_count: 10,
             sample_size: 5,
@@ -148,8 +150,9 @@ mod simulation {
         };
         config.validate();
         let mut simulation = Simulation::new(config);
-        simulation.execute();
+        simulation.execute()?;
         assert_eq!(simulation.interaction_count, 0);
+        Ok(())
     }
 
     #[rstest]
@@ -157,7 +160,7 @@ mod simulation {
     #[case(64)]
     #[case(128)]
     #[case(255)]
-    fn two_agents_only_need_one_interaction(#[case] opinion_count: u8) {
+    fn two_agents_only_need_one_interaction(#[case] opinion_count: u8) -> Result<(), AppError> {
         let config = Config {
             agent_count: 2,
             sample_size: 2,
@@ -165,7 +168,16 @@ mod simulation {
         };
         config.validate();
         let mut simulation = Simulation::new(config);
-        simulation.execute();
+        simulation.execute()?;
         assert_eq!(simulation.interaction_count, 1);
+        Ok(())
+    }
+
+    #[rstest]
+    fn prepare_with_empty_agents_leads_to_err() -> Result<(), AppError> {
+        let mut agents = vec![];
+        let result = Simulation::prepare_interaction(&mut agents, 10);
+        assert!(result.is_err());
+        Ok(())
     }
 }

@@ -1,6 +1,8 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 
+use crate::error::AppError;
+
 #[derive(Clone, Debug)]
 pub struct Agent {
     pub opinion: u8,
@@ -13,11 +15,15 @@ impl Agent {
 
     /// Executes the interaction for an agent and a given sample and updates the simulations
     /// interaction count. Returns the updated opinion as an option.
-    pub fn update(&mut self, agents: &Vec<Agent>, interaction_count: &mut u64) -> Option<u8> {
+    pub fn update(
+        &mut self,
+        agents: &Vec<Agent>,
+        interaction_count: &mut u64,
+    ) -> Result<u8, AppError> {
         // If the sample is empty, do not update the
         // agent opinion and return early.
         if agents.is_empty() {
-            return None;
+            return Err(AppError::EmptySample);
         }
 
         // Counts the occurence of each opinion.
@@ -41,7 +47,7 @@ impl Agent {
         self.opinion = *major_opinion;
         *interaction_count += 1;
 
-        Some(*major_opinion)
+        Ok(*major_opinion)
     }
 }
 
@@ -62,7 +68,10 @@ mod agent {
     #[case(100, 10)]
     #[case(1000, 100)]
     #[case(10000, 200)]
-    fn updates_to_major_opinion(#[case] sample_size: u64, #[case] opinion_count: u8) {
+    fn updates_to_major_opinion(
+        #[case] sample_size: u64,
+        #[case] opinion_count: u8,
+    ) -> Result<(), AppError> {
         let mut rng = rand::thread_rng();
         let mut agent = Agent::new(rng.gen());
 
@@ -82,11 +91,12 @@ mod agent {
         agent.update(
             &[random_agents, fixed_agents].concat(),
             &mut interaction_count,
-        );
+        )?;
 
         // The major opinion should always be 0.
         assert_eq!(agent.opinion, 0);
         assert_eq!(interaction_count, 1);
+        Ok(())
     }
 
     #[rstest]
@@ -94,7 +104,7 @@ mod agent {
     #[case(5)]
     #[case(10)]
     #[case(100)]
-    fn updates_to_major_opinion_on_a_tie(#[case] major_opinion_count: u8) {
+    fn updates_to_major_opinion_on_a_tie(#[case] major_opinion_count: u8) -> Result<(), AppError> {
         let mut rng = rand::thread_rng();
         let mut agent = Agent::new(rng.gen());
 
@@ -114,23 +124,26 @@ mod agent {
         agent.update(
             &[random_agents, fixed_agents].concat(),
             &mut interaction_count,
-        );
+        )?;
 
         // The updated opinion should be equal to one of
         // the major ones.
         let major_opinions = (0..major_opinion_count).collect::<Vec<_>>();
         assert!(major_opinions.contains(&agent.opinion));
         assert_eq!(interaction_count, 1);
+        Ok(())
     }
 
     #[rstest]
-    fn does_not_update_on_empty_sample() {
+    fn does_not_update_on_empty_sample() -> Result<(), AppError> {
         let mut agent = Agent::new(0);
         let empty_sample = vec![];
-
         let mut interaction_count = 0;
-        agent.update(&empty_sample, &mut interaction_count);
+
+        let result = agent.update(&empty_sample, &mut interaction_count);
+        assert!(result.is_err());
         assert_eq!(agent.opinion, 0);
         assert_eq!(interaction_count, 0);
+        Ok(())
     }
 }
