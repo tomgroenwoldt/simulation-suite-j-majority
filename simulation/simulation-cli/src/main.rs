@@ -1,9 +1,11 @@
 use clap::Parser;
 use config::Config;
+use error::AppError;
 use simulation::Simulation;
 
 pub mod agent;
 pub mod config;
+pub mod error;
 pub mod simulation;
 
 #[derive(Debug, Default)]
@@ -15,12 +17,14 @@ pub enum State {
     Exit,
 }
 
-fn main() {
+fn main() -> Result<(), AppError> {
     let config = Config::parse();
     config.validate();
 
     let mut simulation = Simulation::new(config);
-    simulation.execute();
+    simulation.execute()?;
+
+    Ok(())
 }
 
 #[cfg(test)]

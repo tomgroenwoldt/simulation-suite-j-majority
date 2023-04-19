@@ -9,3 +9,4 @@ authors = ["Tom Groenwoldt <tom.groenwoldt@tuhh.de>"]
 clap = { version = "4.2.2", features = ["derive"] }
 rand = "0.8.5"
 rstest = "0.17.0"
+thiserror = "1.0.40"
