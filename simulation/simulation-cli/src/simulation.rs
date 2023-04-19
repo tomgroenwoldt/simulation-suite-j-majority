@@ -1,48 +1,118 @@
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
+use std::collections::HashMap;
 
 use crate::{agent::Agent, Config};
 
 #[derive(Debug, Default)]
+pub struct OpinionDistribution {
+    pub map: HashMap<u8, u64>,
+}
+
+impl OpinionDistribution {
+    pub fn update(&mut self, old_opinion: Option<u8>, new_opinion: u8) -> u64 {
+        if let Some(old_opinion) = old_opinion {
+            self.map.entry(old_opinion).and_modify(|v| *v -= 1);
+        }
+        let updated_count = *self
+            .map
+            .entry(new_opinion)
+            .and_modify(|v| *v += 1)
+            .or_insert_with(|| 1);
+        updated_count
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Simulation {
+    // TODO: Investigate wheter a HashMap would be more fitting.
+    /// Collection of agents.
     pub agents: Vec<Agent>,
+    /// The sample size for each agent.
     pub j: u8,
+    /// The amount of different opinions.
     pub k: u8,
+    /// Counts the interactions of all agents.
     pub interaction_count: u64,
-    // TODO: add opinion_distribution
+    /// Stores number of occurences for each opinion.
+    pub opinion_distribution: OpinionDistribution,
 }
 
 impl Simulation {
+    // TODO: Add constructor methods supporting a bias.
     pub fn new(config: Config) -> Self {
-        let mut agents = vec![];
         let mut rng = rand::thread_rng();
+        let mut agents = vec![];
+        let mut opinion_distribution = OpinionDistribution::default();
 
-        // Create config.agent_count agents with a random opinion between
-        // 0 and config.opinion_count.
+        // Create agents with random opinions and generate the opinion
+        // distribution.
         for _ in 0..config.agent_count {
-            let opinion = rng.gen_range(0..config.opinion_count);
-            agents.push(Agent::new(opinion));
+            let new_opinion = rng.gen_range(0..config.opinion_count);
+            opinion_distribution.update(None, new_opinion);
+            agents.push(Agent::new(new_opinion));
         }
 
         Simulation {
             agents,
             j: config.sample_size,
             k: config.opinion_count,
+            opinion_distribution,
             ..Simulation::default()
         }
     }
-    /// Checks whether all agents hold the same opinion.
-    pub fn reached_consensus(&self) -> bool {
-        if let Some(first_agent) = self.agents.first() {
-            let first_opinion = first_agent.opinion;
-            self.agents
-                .iter()
-                .all(|agent| first_opinion.eq(&agent.opinion))
-        } else {
-            // If the simulation has no agents, we instantly reach consensus.
-            true
+
+    /// Starts the simulation loop and exits if all agents agree on the
+    /// same opinion.
+    pub fn execute(&mut self) {
+        // Return on a single opinion, as consensus is already reached.
+        if self.k.eq(&1) {
+            return;
+        }
+        // TODO: Add this as state.
+        let mut exit = false;
+
+        while !exit {
+            let (chosen_agent, sample) = Simulation::prepare_interaction(&mut self.agents, self.j);
+            let old_opinion = chosen_agent.opinion;
+
+            let new_opinion = chosen_agent
+                .update(&sample, &mut self.interaction_count)
+                .unwrap();
+            let updated_opinion_count = self
+                .opinion_distribution
+                .update(Some(old_opinion), new_opinion);
+
+            // Exit simulation if all agents agree on the new opinion.
+            if updated_opinion_count.eq(&(self.agents.len() as u64)) {
+                exit = true;
+            }
         }
     }
-    // TODO: Add constructor methods supporting a bias.
+
+    /// Chooses and returns a agent uniformly at random as well as a sample of
+    /// given size.
+    pub fn prepare_interaction(
+        agents: &mut Vec<Agent>,
+        sample_size: u8,
+    ) -> (&mut Agent, Vec<Agent>) {
+        let mut rng = rand::thread_rng();
+        let n = agents.len();
+        // Swap a random agent to the first position. This way we can always
+        // split the vector via `.split_first_mut()` to work via references.
+        agents.swap(0, rng.gen_range(0..n));
+
+        // We can safely unwrap here, because we don't remove agents.
+        let (chosen_agent, remaining) = agents.split_first_mut().unwrap();
+
+        // Randomly choose j agents out of remaining vector.
+        // Update opinion distribution and agent.
+        let sample = remaining
+            .choose_multiple(&mut rng, sample_size as usize)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        (chosen_agent, sample)
+    }
 }
 
 #[cfg(test)]
@@ -51,15 +121,51 @@ mod simulation {
     use rstest::rstest;
 
     #[rstest]
-    #[case(0)]
-    #[case(1)]
-    fn achieve_consensus_with_at_most_one_agent(#[case] agent_count: u64) {
+    fn can_create() {
+        let opinion_count = 2;
+        let sample_size = 5;
+        let agent_count = 10;
         let config = Config {
             agent_count,
-            sample_size: 5,
-            opinion_count: 5,
+            sample_size,
+            opinion_count,
         };
-        let simulation_without_agents = Simulation::new(config);
-        assert!(simulation_without_agents.reached_consensus());
+        config.validate();
+
+        let simulation = Simulation::new(config);
+
+        assert_eq!(simulation.agents.len(), agent_count as usize);
+        assert_eq!(simulation.j, sample_size);
+        assert_eq!(simulation.k, opinion_count);
+    }
+
+    #[rstest]
+    fn single_opinion_leads_to_exit() {
+        let config = Config {
+            agent_count: 10,
+            sample_size: 5,
+            opinion_count: 1,
+        };
+        config.validate();
+        let mut simulation = Simulation::new(config);
+        simulation.execute();
+        assert_eq!(simulation.interaction_count, 0);
+    }
+
+    #[rstest]
+    #[case(32)]
+    #[case(64)]
+    #[case(128)]
+    #[case(255)]
+    fn two_agents_only_need_one_interaction(#[case] opinion_count: u8) {
+        let config = Config {
+            agent_count: 2,
+            sample_size: 2,
+            opinion_count,
+        };
+        config.validate();
+        let mut simulation = Simulation::new(config);
+        simulation.execute();
+        assert_eq!(simulation.interaction_count, 1);
     }
 }

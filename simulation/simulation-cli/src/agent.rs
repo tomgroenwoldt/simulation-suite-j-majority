@@ -11,17 +11,20 @@ impl Agent {
         Agent { opinion }
     }
 
-    pub fn update(&mut self, agents: &Vec<Agent>) {
+    /// Executes the interaction for an agent and a given sample and updates the simulations
+    /// interaction count. Returns the updated opinion as an option.
+    pub fn update(&mut self, agents: &Vec<Agent>, interaction_count: &mut u64) -> Option<u8> {
         // If the sample is empty, do not update the
         // agent opinion and return early.
         if agents.is_empty() {
-            return;
+            return None;
         }
 
         // Counts the occurence of each opinion.
         let mut counts = HashMap::new();
 
         // Find the major opinions in the given sample.
+        // TODO: Investigate if there is a less complex approach.
         agents.iter().for_each(|agent| {
             *counts.entry(agent.opinion).or_insert(0) += 1;
         });
@@ -33,9 +36,12 @@ impl Agent {
             .collect();
 
         // On a tie, choose arbitrarily and update.
-        if let Some(major_opinion) = major_opinions.choose(&mut rand::thread_rng()) {
-            self.opinion = *major_opinion;
-        };
+        // Safe to unwrap as we check agents for emptiness.
+        let major_opinion = major_opinions.choose(&mut rand::thread_rng()).unwrap();
+        self.opinion = *major_opinion;
+        *interaction_count += 1;
+
+        Some(*major_opinion)
     }
 }
 
@@ -72,10 +78,15 @@ mod agent {
             .map(|_| Agent::new(0))
             .collect::<Vec<_>>();
 
-        agent.update(&[random_agents, fixed_agents].concat());
+        let mut interaction_count = 0;
+        agent.update(
+            &[random_agents, fixed_agents].concat(),
+            &mut interaction_count,
+        );
 
         // The major opinion should always be 0.
         assert_eq!(agent.opinion, 0);
+        assert_eq!(interaction_count, 1);
     }
 
     #[rstest]
@@ -99,12 +110,17 @@ mod agent {
             .flat_map(|opinion| (0..101).map(|_| Agent::new(opinion)).collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
-        agent.update(&[random_agents, fixed_agents].concat());
+        let mut interaction_count = 0;
+        agent.update(
+            &[random_agents, fixed_agents].concat(),
+            &mut interaction_count,
+        );
 
         // The updated opinion should be equal to one of
         // the major ones.
         let major_opinions = (0..major_opinion_count).collect::<Vec<_>>();
         assert!(major_opinions.contains(&agent.opinion));
+        assert_eq!(interaction_count, 1);
     }
 
     #[rstest]
@@ -112,7 +128,9 @@ mod agent {
         let mut agent = Agent::new(0);
         let empty_sample = vec![];
 
-        agent.update(&empty_sample);
+        let mut interaction_count = 0;
+        agent.update(&empty_sample, &mut interaction_count);
         assert_eq!(agent.opinion, 0);
+        assert_eq!(interaction_count, 0);
     }
 }
