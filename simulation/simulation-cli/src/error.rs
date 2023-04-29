@@ -6,4 +6,6 @@ pub enum AppError {
     EmptyAgents,
     #[error("The sample for an agent update is not allowed to be empty.")]
     EmptySample,
+    #[error("Error while starting GUI.")]
+    Egui(#[from] eframe::Error),
 }
