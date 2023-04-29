@@ -1,14 +1,30 @@
-use clap::Parser;
 use config::Config;
+use eframe::NativeOptions;
+
 use error::AppError;
-use simulation::Simulation;
+use simulation::{FrontendSimulation, SimulationMessage};
+use std::{
+    sync::{
+        mpsc::{self, Sender},
+        Arc, Mutex,
+    },
+    thread,
+};
 
 pub mod agent;
 pub mod config;
 pub mod error;
 pub mod simulation;
+pub mod ui;
 
-#[derive(Debug, Default)]
+pub struct App {
+    state: State,
+    config: Config,
+    simulation: Arc<Mutex<FrontendSimulation>>,
+    sender: Sender<SimulationMessage>,
+}
+
+#[derive(Debug, Default, PartialEq)]
 pub enum State {
     #[default]
     Config,
@@ -17,29 +33,45 @@ pub enum State {
     Exit,
 }
 
-fn main() -> Result<(), AppError> {
-    let config = Config::parse();
-    config.validate();
+impl App {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let (sender, receiver) = mpsc::channel::<SimulationMessage>();
 
-    let mut simulation = Simulation::new(config);
-    simulation.execute()?;
+        let frontend_simulation = Arc::new(Mutex::new(FrontendSimulation::default()));
+        let frontend_simulation_clone = Arc::clone(&frontend_simulation);
+        let ctx_clone = cc.egui_ctx.clone();
 
-    Ok(())
+        // Message handler which communicates with the simulation thread.
+        thread::spawn(move || {
+            for msg in &receiver {
+                let mut simulation = frontend_simulation_clone.lock().unwrap();
+                match msg {
+                    SimulationMessage::Update((old, new, new_interaction_count)) => {
+                        simulation.opinion_distribution.update(old, new);
+                        simulation.interaction_count = new_interaction_count;
+                        ctx_clone.request_repaint();
+                    }
+                    SimulationMessage::Finish => simulation.finished = true,
+                }
+            }
+        });
+
+        Self {
+            state: State::Config,
+            config: Config::default(),
+            simulation: frontend_simulation,
+            sender,
+        }
+    }
 }
 
-#[cfg(test)]
-mod main {
-    use super::*;
-    use rstest::rstest;
+fn main() -> Result<(), AppError> {
+    // Run GUI.
+    eframe::run_native(
+        "Simulation",
+        NativeOptions::default(),
+        Box::new(|cc| Box::new(App::new(cc))),
+    )?;
 
-    #[rstest]
-    #[should_panic]
-    fn panic_on_sample_size_greater_than_agent_count() {
-        let config = Config {
-            agent_count: 10,
-            sample_size: 11,
-            opinion_count: 5,
-        };
-        config.validate();
-    }
+    Ok(())
 }

@@ -1,22 +1,20 @@
-use clap::Parser;
+use std::collections::HashMap;
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[derive(Clone, Debug)]
 pub struct Config {
-    #[arg(short, long, value_parser = clap::value_parser!(u64).range(1..))]
     pub agent_count: u64,
-
-    #[arg(short, long)]
     pub sample_size: u8,
-
-    #[arg(short, long)]
     pub opinion_count: u8,
+    pub weights: HashMap<u8, u8>,
 }
 
-impl Config {
-    pub fn validate(&self) {
-        if self.sample_size as u64 > self.agent_count {
-            panic!("It is not possible to sample a greater number of agents than the total number of agents currently present.");
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            agent_count: 10000,
+            sample_size: 2,
+            opinion_count: 2,
+            weights: HashMap::new(),
         }
     }
 }
