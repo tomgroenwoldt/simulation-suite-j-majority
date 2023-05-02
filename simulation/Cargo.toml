@@ -1,6 +1,6 @@
 [package]
-name = "simulation_cli"
-description = "Simulation CLI tool for my bachelor thesis"
+name = "simulation"
+description = "Simulation tool for my bachelor thesis"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tom Groenwoldt <tom.groenwoldt@tuhh.de>"]
