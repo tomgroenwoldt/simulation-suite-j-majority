@@ -5,7 +5,7 @@ use error::AppError;
 use simulation::{FrontendSimulation, SimulationMessage};
 use std::{
     sync::{
-        mpsc::{self, Sender},
+        mpsc::{self, SyncSender},
         Arc, Mutex,
     },
     thread,
@@ -21,7 +21,7 @@ pub struct App {
     state: State,
     config: Config,
     simulations: Vec<Arc<Mutex<FrontendSimulation>>>,
-    senders: Vec<Sender<SimulationMessage>>,
+    senders: Vec<SyncSender<SimulationMessage>>,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -40,7 +40,7 @@ impl App {
 
         // Create ten worker threads which are listening to possible simulations.
         for _ in 0..10 {
-            let (sender, receiver) = mpsc::channel::<SimulationMessage>();
+            let (sender, receiver) = mpsc::sync_channel::<SimulationMessage>(1000);
 
             let frontend_simulation = Arc::new(Mutex::new(FrontendSimulation::default()));
             let frontend_simulation_clone = Arc::clone(&frontend_simulation);
