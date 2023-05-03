@@ -74,6 +74,7 @@ impl App {
 }
 
 fn main() -> Result<(), AppError> {
+    tracing_subscriber::fmt::init();
     // Run GUI.
     eframe::run_native(
         "Simulation",
