@@ -22,13 +22,9 @@ cd thesis/
 ```
 
 ## Simulation
-The simulation consists of a simulation CLI tool and will also include a GUI in the near future.
+The simulation executes the j-Majority protocol on `n` agents with `k` possible opinions.
 
-### CLI tool
-The CLI tool takes in the following parameters:
-- `--agent-count`
-- `--sample-size`
-- `--opinion-count`
+It consists of a GUI application built with `egui`.
 
 #### Development
 The tool is written in Rust, therefore install the toolchain for development <https://www.rust-lang.org/tools/install>.
