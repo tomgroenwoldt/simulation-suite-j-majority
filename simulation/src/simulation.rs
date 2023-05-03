@@ -1,7 +1,7 @@
 use rand::{
     distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
 };
-use std::{collections::HashMap, sync::mpsc::Sender};
+use std::{collections::HashMap, sync::mpsc::SyncSender};
 use tracing::{error, info};
 
 use crate::{agent::Agent, error::AppError, Config};
@@ -41,7 +41,7 @@ pub struct Simulation {
     pub interaction_count: u64,
     /// Stores number of occurences for each opinion.
     pub opinion_distribution: OpinionDistribution,
-    pub sender: Sender<SimulationMessage>,
+    pub sender: SyncSender<SimulationMessage>,
 }
 
 pub enum SimulationMessage {
@@ -57,7 +57,7 @@ pub struct FrontendSimulation {
 }
 
 impl Simulation {
-    pub fn new(config: Config, sender: Sender<SimulationMessage>) -> Self {
+    pub fn new(config: Config, sender: SyncSender<SimulationMessage>) -> Self {
         let mut rng = rand::thread_rng();
         let mut agents = vec![];
         let mut opinion_distribution = OpinionDistribution::default();
@@ -171,16 +171,16 @@ impl Simulation {
 mod simulation {
     use super::*;
     use rstest::{fixture, rstest};
-    use std::sync::mpsc::channel;
+    use std::sync::mpsc::sync_channel;
 
     #[fixture]
-    fn sender() -> Sender<SimulationMessage> {
-        let (tx, _) = channel();
+    fn sender() -> SyncSender<SimulationMessage> {
+        let (tx, _) = sync_channel(1000);
         tx
     }
 
     #[rstest]
-    fn can_create(sender: Sender<SimulationMessage>) {
+    fn can_create(sender: SyncSender<SimulationMessage>) {
         let config = Config::default();
         let simulation = Simulation::new(config.clone(), sender);
 
@@ -190,7 +190,7 @@ mod simulation {
     }
 
     #[rstest]
-    fn single_opinion_leads_to_exit(sender: Sender<SimulationMessage>) -> Result<(), AppError> {
+    fn single_opinion_leads_to_exit(sender: SyncSender<SimulationMessage>) -> Result<(), AppError> {
         let config = Config {
             agent_count: 10,
             sample_size: 5,
@@ -210,7 +210,7 @@ mod simulation {
     #[case(255)]
     fn two_agents_only_need_one_interaction(
         #[case] opinion_count: u8,
-        sender: Sender<SimulationMessage>,
+        sender: SyncSender<SimulationMessage>,
     ) -> Result<(), AppError> {
         let config = Config {
             agent_count: 2,
