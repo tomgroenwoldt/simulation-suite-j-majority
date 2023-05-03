@@ -4,10 +4,7 @@ use egui::{
 };
 use std::thread;
 
-use crate::{
-    simulation::{OpinionDistribution, Simulation},
-    App, State,
-};
+use crate::{simulation::Simulation, App, State};
 
 /// GUI implementation via egui and eframe.
 impl eframe::App for App {
@@ -55,30 +52,42 @@ impl eframe::App for App {
                             .vertical(),
                         );
                     }
+                    // Remove old opinion distribution entries. Otherwise a decrease in opinion
+                    // count via the GUI would result in a program crash.
+                    for old in self.config.opinion_count..10 {
+                        self.config.weights.remove_entry(&old);
+                    }
                 });
             });
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.set_enabled(self.state.eq(&State::Simulation));
-                // egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
-                //     ui.heading("Simulation");
-                //     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                //         ui.label(format!(
-                //             "Number of interactions: {}",
-                //             simulation.interaction_count
-                //         ));
-                //         if simulation.finished
-                //             && ui
-                //                 .button("Simulation finished. Click to simulate again!")
-                //                 .clicked()
-                //         {
-                //             // Reset the simulation. This way we keep the communication with the
-                //             // simulation thread open.
-                //             simulation.opinion_distribution = OpinionDistribution::default();
-                //             simulation.finished = false;
-                //             self.state = State::Config;
-                //         }
-                //     });
-                // });
+                egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
+                    ui.heading("Simulation");
+                    let finished = self
+                        .simulations
+                        .iter()
+                        .all(|sim| sim.lock().unwrap().finished);
+                    ui.set_enabled(finished);
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        // ui.label(format!(
+                        //     "Number of interactions: {}",
+                        //     simulation.interaction_count
+                        // ));
+                        if ui
+                            .button("Simulations finished. Click to simulate again!")
+                            .clicked()
+                        {
+                            // Reset the simulations. This way we keep the communication with the
+                            // simulation thread open.
+                            for simulation in self.simulations.iter() {
+                                let mut simulation = simulation.lock().unwrap();
+                                simulation.opinion_distribution.clear();
+                                simulation.finished = false;
+                            }
+                            self.state = State::Config;
+                        }
+                    });
+                });
                 egui::CentralPanel::default().show(ctx, |ui| {
                     let mut charts = vec![];
                     for (index, simulation) in self.simulations.iter().enumerate() {
@@ -89,13 +98,17 @@ impl eframe::App for App {
                                 .map
                                 .iter()
                                 .map(|(x, y)| {
-                                    Bar::new(*x as f64 + (10_f64 * index as f64), *y as f64)
-                                        .width(0.8_f64)
+                                    Bar::new(
+                                        *x as f64
+                                            + ((self.config.opinion_count * 2) as f64
+                                                * index as f64),
+                                        *y as f64,
+                                    )
+                                    .width(0.8_f64)
                                 })
                                 .collect(),
                         )
-                        .color(Color32::WHITE)
-                        .highlight(true);
+                        .color(Color32::WHITE);
                         charts.push(chart);
                     }
 

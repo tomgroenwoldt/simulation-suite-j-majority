@@ -1,6 +1,8 @@
-use rand::{distributions::WeightedIndex, prelude::Distribution, seq::SliceRandom, Rng};
+use rand::{
+    distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
+};
 use std::{collections::HashMap, sync::mpsc::Sender};
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{agent::Agent, error::AppError, Config};
 
@@ -20,6 +22,10 @@ impl OpinionDistribution {
             .and_modify(|v| *v += 1)
             .or_insert_with(|| 1);
         updated_count
+    }
+
+    pub fn clear(&mut self) {
+        self.map.clear();
     }
 }
 
@@ -74,6 +80,8 @@ impl Simulation {
             agents.push(Agent::new(new_opinion));
         }
 
+        info!("Agent initilization finished!");
+
         Simulation {
             agents,
             j: config.sample_size,
@@ -94,8 +102,11 @@ impl Simulation {
         // TODO: Add this as state.
         let mut exit = false;
 
+        let mut rng = rand::thread_rng();
+
         while !exit {
-            let (chosen_agent, sample) = Simulation::prepare_interaction(&mut self.agents, self.j)?;
+            let (chosen_agent, sample) =
+                Simulation::prepare_interaction(&mut self.agents, self.j, &mut rng)?;
             let old_opinion = chosen_agent.opinion;
 
             // Update agent opinion and set new opinion distribution.
@@ -117,6 +128,10 @@ impl Simulation {
 
             // Exit simulation if all agents agree on the new opinion.
             if updated_opinion_count.eq(&(self.agents.len() as u64)) {
+                info!(
+                    "Agents reached consensus with {} interactions!",
+                    self.interaction_count
+                );
                 exit = true;
                 if self.sender.send(SimulationMessage::Finish).is_err() {
                     error!("Error sending simulation the finish message.");
@@ -128,11 +143,11 @@ impl Simulation {
 
     /// Chooses and returns a agent uniformly at random as well as a sample of
     /// given size.
-    pub fn prepare_interaction(
-        agents: &mut Vec<Agent>,
+    pub fn prepare_interaction<'a>(
+        agents: &'a mut Vec<Agent>,
         sample_size: u8,
-    ) -> Result<(&mut Agent, Vec<Agent>), AppError> {
-        let mut rng = rand::thread_rng();
+        rng: &mut ThreadRng,
+    ) -> Result<(&'a mut Agent, Vec<Agent>), AppError> {
         let n = agents.len();
 
         if n.eq(&0) {
@@ -144,7 +159,7 @@ impl Simulation {
         agents.swap(0, rng.gen_range(0..n));
         let (chosen_agent, remaining) = agents.split_first_mut().unwrap();
         let sample = remaining
-            .choose_multiple(&mut rng, sample_size as usize)
+            .choose_multiple(rng, sample_size as usize)
             .cloned()
             .collect::<Vec<_>>();
 
@@ -212,7 +227,8 @@ mod simulation {
     #[rstest]
     fn prepare_with_empty_agents_leads_to_err() -> Result<(), AppError> {
         let mut agents = vec![];
-        let result = Simulation::prepare_interaction(&mut agents, 10);
+        let mut rng = rand::thread_rng();
+        let result = Simulation::prepare_interaction(&mut agents, 10, &mut rng);
         assert!(result.is_err());
         Ok(())
     }
