@@ -241,9 +241,9 @@ mod simulation {
     }
 
     #[rstest]
-    fn can_create(sender: SyncSender<SimulationMessage>, receiver: Receiver<SimulationMessage>) {
+    fn can_create(sender: SyncSender<SimulationMessage>) {
         let config = Config::default();
-        let simulation = Simulation::new(config.clone(), sender, receiver);
+        let simulation = Simulation::new(config.clone(), sender);
 
         assert_eq!(simulation.agents.len() as u64, config.agent_count);
         assert_eq!(simulation.j, config.sample_size);
@@ -251,18 +251,15 @@ mod simulation {
     }
 
     #[rstest]
-    fn single_opinion_leads_to_exit(
-        sender: SyncSender<SimulationMessage>,
-        receiver: Receiver<SimulationMessage>,
-    ) -> Result<(), AppError> {
+    fn single_opinion_leads_to_exit() -> Result<(), AppError> {
         let config = Config {
             agent_count: 10,
             sample_size: 5,
             opinion_count: 1,
             weights: HashMap::new(),
         };
-        let mut simulation = Simulation::new(config, sender, receiver);
-        simulation.execute(receiver)?;
+        let mut simulation = Simulation::new(config, sender());
+        simulation.execute(receiver())?;
         assert_eq!(simulation.interaction_count, 0);
         Ok(())
     }
@@ -272,19 +269,15 @@ mod simulation {
     #[case(64)]
     #[case(128)]
     #[case(255)]
-    fn two_agents_only_need_one_interaction(
-        #[case] opinion_count: u8,
-        sender: SyncSender<SimulationMessage>,
-        receiver: Receiver<SimulationMessage>,
-    ) -> Result<(), AppError> {
+    fn two_agents_only_need_one_interaction(#[case] opinion_count: u8) -> Result<(), AppError> {
         let config = Config {
             agent_count: 2,
             sample_size: 2,
             opinion_count,
             weights: HashMap::new(),
         };
-        let mut simulation = Simulation::new(config, sender, receiver);
-        simulation.execute()?;
+        let mut simulation = Simulation::new(config, sender());
+        simulation.execute(receiver())?;
         assert_eq!(simulation.interaction_count, 1);
         Ok(())
     }
