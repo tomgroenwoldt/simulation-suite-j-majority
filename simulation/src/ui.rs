@@ -1,11 +1,9 @@
-use egui::{
-    plot::{Bar, BarChart, Plot},
-    Color32,
-};
 use std::thread;
 
+use egui::plot::{Bar, BarChart, Legend, Plot};
+
 use crate::{
-    simulation::{OpinionDistribution, Simulation},
+    simulation::{Simulation, SimulationMessage},
     App, State,
 };
 
@@ -19,30 +17,21 @@ impl eframe::App for App {
                 ui.add(
                     egui::Slider::new(&mut self.config.agent_count, 2..=100000000)
                         .text("Number of Agents")
-                        .logarithmic(true),
+                        .logarithmic(true)
+                        .trailing_fill(true),
                 );
                 ui.add(
-                    egui::Slider::new(&mut self.config.sample_size, 2..=255).text("Sample Size"),
+                    egui::Slider::new(&mut self.config.sample_size, 2..=255)
+                        .text("Sample Size")
+                        .trailing_fill(true),
                 );
                 ui.add(
                     egui::Slider::new(&mut self.config.opinion_count, 2..=10)
-                        .text("Number of Opinions"),
+                        .text("Number of Opinions")
+                        .trailing_fill(true),
                 );
-                if ui.button("Start simulation").clicked() {
-                    self.state = State::Simulation;
-
-                    // Execute the simulation on another thread.
-                    for sender in &self.senders {
-                        let sender = sender.clone();
-                        let config = self.config.clone();
-                        thread::spawn(move || {
-                            let mut simulation = Simulation::new(config, sender);
-                            simulation.execute().unwrap();
-                        });
-                    }
-                }
             });
-            egui::TopBottomPanel::bottom("opinion_distribution_configuration").show(ctx, |ui| {
+            egui::TopBottomPanel::top("opinion_distribution_configuration").show(ctx, |ui| {
                 ui.set_enabled(self.state.eq(&State::Config));
                 ui.heading("Opinion distribution");
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -52,33 +41,72 @@ impl eframe::App for App {
                                 self.config.weights.entry(opinion).or_insert(1),
                                 0..=5,
                             )
-                            .vertical(),
+                            .vertical()
+                            .trailing_fill(true),
                         );
+                    }
+                    // Remove old opinion distribution entries. Otherwise a decrease in opinion
+                    // count via the GUI would result in a program crash.
+                    for old in self.config.opinion_count..10 {
+                        self.config.weights.remove_entry(&old);
                     }
                 });
             });
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.set_enabled(self.state.eq(&State::Simulation));
-                // egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
-                //     ui.heading("Simulation");
-                //     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                //         ui.label(format!(
-                //             "Number of interactions: {}",
-                //             simulation.interaction_count
-                //         ));
-                //         if simulation.finished
-                //             && ui
-                //                 .button("Simulation finished. Click to simulate again!")
-                //                 .clicked()
-                //         {
-                //             // Reset the simulation. This way we keep the communication with the
-                //             // simulation thread open.
-                //             simulation.opinion_distribution = OpinionDistribution::default();
-                //             simulation.finished = false;
-                //             self.state = State::Config;
-                //         }
-                //     });
-                // });
+            egui::CentralPanel::default().show(ctx, |_ui| {
+                egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
+                    ui.heading("Simulation");
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add_enabled_ui(self.state.eq(&State::Config), |ui| {
+                            if ui.button("Start").clicked() {
+                                self.state = State::Simulation;
+
+                                // Execute the simulation on another thread.
+                                for sender in &self.senders {
+                                    let sender = sender.clone();
+                                    let config = self.config.clone();
+                                    let receiver = self.broadcast.subscribe();
+                                    thread::spawn(move || {
+                                        let mut simulation = Simulation::new(config, sender);
+                                        simulation.execute(receiver).unwrap();
+                                    });
+                                }
+                            }
+                        });
+                        ui.add_enabled_ui(self.state.eq(&State::Simulation), |ui| {
+                            let finished = self
+                                .simulations
+                                .iter()
+                                .all(|sim| sim.lock().unwrap().finished);
+                            ui.add_enabled_ui(!finished, |ui| {
+                                if ui.toggle_value(&mut self.paused, "Pause").clicked() {
+                                    match self.paused {
+                                        true => {
+                                            self.broadcast.send(SimulationMessage::Pause).unwrap()
+                                        }
+                                        false => {
+                                            self.broadcast.send(SimulationMessage::Play).unwrap()
+                                        }
+                                    };
+                                }
+                                if ui.button("Abort").clicked() {
+                                    self.broadcast.send(SimulationMessage::Abort).unwrap();
+                                }
+                            });
+                            ui.add_enabled_ui(finished, |ui| {
+                                if ui.button("Repeat").clicked() {
+                                    // Reset the simulations. This way we keep the communication with the
+                                    // simulation thread open.
+                                    for simulation in self.simulations.iter() {
+                                        let mut simulation = simulation.lock().unwrap();
+                                        simulation.opinion_distribution.clear();
+                                        simulation.finished = false;
+                                    }
+                                    self.state = State::Config;
+                                }
+                            });
+                        });
+                    });
+                });
                 egui::CentralPanel::default().show(ctx, |ui| {
                     let mut charts = vec![];
                     for (index, simulation) in self.simulations.iter().enumerate() {
@@ -89,21 +117,28 @@ impl eframe::App for App {
                                 .map
                                 .iter()
                                 .map(|(x, y)| {
-                                    Bar::new(*x as f64 + (10_f64 * index as f64), *y as f64)
-                                        .width(0.8_f64)
+                                    Bar::new(
+                                        *x as f64
+                                            + ((self.config.opinion_count * 2) as f64
+                                                * index as f64),
+                                        *y as f64,
+                                    )
+                                    .width(0.8_f64)
                                 })
                                 .collect(),
                         )
-                        .color(Color32::WHITE)
-                        .highlight(true);
+                        .name(self.formatter.format(simulation.interaction_count as f64));
+
                         charts.push(chart);
                     }
 
-                    Plot::new("chart").show(ui, |plot_ui| {
-                        for chart in charts {
-                            plot_ui.bar_chart(chart);
-                        }
-                    });
+                    Plot::new("chart")
+                        .legend(Legend::default().background_alpha(1.0))
+                        .show(ui, |plot_ui| {
+                            for chart in charts {
+                                plot_ui.bar_chart(chart);
+                            }
+                        });
                 });
             });
         });
