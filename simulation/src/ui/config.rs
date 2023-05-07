@@ -29,7 +29,7 @@ pub fn render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
         for opinion in 0..app.config.opinion_count {
             ui.add(
-                egui::Slider::new(app.config.weights.entry(opinion).or_insert(1), 0..=5)
+                egui::Slider::new(app.config.weights.entry(opinion).or_insert(1), 0..=50)
                     .vertical()
                     .trailing_fill(true),
             );

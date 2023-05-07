@@ -11,6 +11,7 @@ use std::{
         Arc, Mutex,
     },
     thread,
+    time::Duration,
 };
 use tokio::sync::broadcast::{self, Sender};
 
@@ -43,6 +44,15 @@ impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut simulations = vec![];
         let mut senders = vec![];
+        let update_interval = Duration::from_millis(10);
+
+        let ctx_clone = cc.egui_ctx.clone();
+        // Helper thread which periodically requests a repaint. This is more
+        // efficient than repainting on every simulation update.
+        thread::spawn(move || loop {
+            ctx_clone.request_repaint_after(update_interval);
+            thread::sleep(update_interval / 5);
+        });
 
         // Create ten worker threads which are listening to possible simulations.
         for _ in 0..10 {
@@ -50,7 +60,6 @@ impl App {
 
             let frontend_simulation = Arc::new(Mutex::new(FrontendSimulation::default()));
             let frontend_simulation_clone = Arc::clone(&frontend_simulation);
-            let ctx_clone = cc.egui_ctx.clone();
             simulations.push(frontend_simulation);
             senders.push(sender);
 
@@ -62,7 +71,6 @@ impl App {
                         SimulationMessage::Update((old, new, new_interaction_count)) => {
                             simulation.opinion_distribution.update(old, new);
                             simulation.interaction_count = new_interaction_count;
-                            ctx_clone.request_repaint();
                         }
                         SimulationMessage::Finish => simulation.finished = true,
                         _ => {}

@@ -42,6 +42,7 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
                     }
                     if ui.button("Abort").clicked() {
                         app.broadcast.send(SimulationMessage::Abort).unwrap();
+                        app.paused = false;
                     }
                 });
                 ui.add_enabled_ui(finished, |ui| {
@@ -49,6 +50,7 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
                         // Reset the simulations. This way we keep the communication with the
                         // simulation thread open.
                         for simulation in app.simulations.iter() {
+                            app.broadcast.send(SimulationMessage::Finish).unwrap();
                             let mut simulation = simulation.lock().unwrap();
                             simulation.opinion_distribution.clear();
                             simulation.finished = false;
