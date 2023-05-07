@@ -139,6 +139,10 @@ impl Simulation {
                     SimulationMessage::Abort => {
                         *state = SimulationState::Exit;
                     }
+                    SimulationMessage::Finish => {
+                        cvar.notify_one();
+                        return;
+                    }
                     _ => {}
                 }
                 cvar.notify_one();
