@@ -1,7 +1,13 @@
+use futures::executor::block_on;
 use rand::{
     distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
 };
-use std::{collections::HashMap, sync::mpsc::SyncSender};
+use std::{
+    collections::HashMap,
+    sync::{mpsc::SyncSender, Arc, Condvar, Mutex},
+    thread,
+};
+use tokio::sync::broadcast::Receiver;
 use tracing::{error, info};
 
 use crate::{agent::Agent, error::AppError, Config};
@@ -42,9 +48,23 @@ pub struct Simulation {
     /// Stores number of occurences for each opinion.
     pub opinion_distribution: OpinionDistribution,
     pub sender: SyncSender<SimulationMessage>,
+    /// State and condition variable, which can block the executor thread
+    /// of the simulation.
+    pub state: Arc<(Mutex<SimulationState>, Condvar)>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum SimulationState {
+    Pause,
+    Play,
+    Exit,
+}
+
+#[derive(Clone, Debug)]
 pub enum SimulationMessage {
+    Pause,
+    Play,
+    Abort,
     Update((Option<u8>, u8, u64)),
     Finish,
 }
@@ -89,22 +109,58 @@ impl Simulation {
             opinion_distribution,
             interaction_count: 0,
             sender,
+            state: Arc::new((Mutex::new(SimulationState::Play), Condvar::new())),
         }
     }
 
     /// Starts the simulation loop and exits if all agents agree on the
     /// same opinion.
-    pub fn execute(&mut self) -> Result<(), AppError> {
+    pub fn execute(&mut self, receiver: Receiver<SimulationMessage>) -> Result<(), AppError> {
         // Return on a single opinion, as consensus is already reached.
         if self.k.eq(&1) {
             return Ok(());
         }
-        // TODO: Add this as state.
-        let mut exit = false;
+        let mut receiver = receiver.resubscribe();
+
+        let state = Arc::clone(&self.state);
+
+        // Message handler which communicates with the GUI.
+        thread::spawn(move || loop {
+            if let Ok(msg) = block_on(receiver.recv()) {
+                let (lock, cvar) = &*state;
+                let mut state = lock.lock().unwrap();
+                match msg {
+                    SimulationMessage::Pause => {
+                        *state = SimulationState::Pause;
+                    }
+                    SimulationMessage::Play => {
+                        *state = SimulationState::Play;
+                    }
+                    SimulationMessage::Abort => {
+                        *state = SimulationState::Exit;
+                    }
+                    _ => {}
+                }
+                cvar.notify_one();
+            }
+        });
 
         let mut rng = rand::thread_rng();
+        let (lock, cvar) = &*self.state;
 
-        while !exit {
+        loop {
+            let mut state = lock.lock().unwrap();
+            if state.eq(&SimulationState::Exit) {
+                if self.sender.send(SimulationMessage::Finish).is_err() {
+                    error!("Error sending simulation the finish message.");
+                }
+                break;
+            }
+            // Do nothing on pause
+            while state.eq(&SimulationState::Pause) {
+                state = cvar.wait(state).unwrap();
+            }
+            drop(state);
             let (chosen_agent, sample) =
                 Simulation::prepare_interaction(&mut self.agents, self.j, &mut rng)?;
             let old_opinion = chosen_agent.opinion;
@@ -126,16 +182,14 @@ impl Simulation {
                 error!("Error sending simulation updates to egui!");
             }
 
-            // Exit simulation if all agents agree on the new opinion.
+            // Exit simulation if all agents agree on one opinion.
             if updated_opinion_count.eq(&(self.agents.len() as u64)) {
                 info!(
                     "Agents reached consensus with {} interactions!",
                     self.interaction_count
                 );
-                exit = true;
-                if self.sender.send(SimulationMessage::Finish).is_err() {
-                    error!("Error sending simulation the finish message.");
-                }
+                let mut state = lock.lock().unwrap();
+                *state = SimulationState::Exit;
             }
         }
         Ok(())
@@ -172,6 +226,7 @@ mod simulation {
     use super::*;
     use rstest::{fixture, rstest};
     use std::sync::mpsc::sync_channel;
+    use tokio::sync::broadcast::{channel, Receiver};
 
     #[fixture]
     fn sender() -> SyncSender<SimulationMessage> {
@@ -179,10 +234,16 @@ mod simulation {
         tx
     }
 
+    #[fixture]
+    fn receiver() -> Receiver<SimulationMessage> {
+        let (tx, _) = channel(1000);
+        tx.subscribe()
+    }
+
     #[rstest]
-    fn can_create(sender: SyncSender<SimulationMessage>) {
+    fn can_create(sender: SyncSender<SimulationMessage>, receiver: Receiver<SimulationMessage>) {
         let config = Config::default();
-        let simulation = Simulation::new(config.clone(), sender);
+        let simulation = Simulation::new(config.clone(), sender, receiver);
 
         assert_eq!(simulation.agents.len() as u64, config.agent_count);
         assert_eq!(simulation.j, config.sample_size);
@@ -190,15 +251,18 @@ mod simulation {
     }
 
     #[rstest]
-    fn single_opinion_leads_to_exit(sender: SyncSender<SimulationMessage>) -> Result<(), AppError> {
+    fn single_opinion_leads_to_exit(
+        sender: SyncSender<SimulationMessage>,
+        receiver: Receiver<SimulationMessage>,
+    ) -> Result<(), AppError> {
         let config = Config {
             agent_count: 10,
             sample_size: 5,
             opinion_count: 1,
             weights: HashMap::new(),
         };
-        let mut simulation = Simulation::new(config, sender);
-        simulation.execute()?;
+        let mut simulation = Simulation::new(config, sender, receiver);
+        simulation.execute(receiver)?;
         assert_eq!(simulation.interaction_count, 0);
         Ok(())
     }
@@ -211,6 +275,7 @@ mod simulation {
     fn two_agents_only_need_one_interaction(
         #[case] opinion_count: u8,
         sender: SyncSender<SimulationMessage>,
+        receiver: Receiver<SimulationMessage>,
     ) -> Result<(), AppError> {
         let config = Config {
             agent_count: 2,
@@ -218,7 +283,7 @@ mod simulation {
             opinion_count,
             weights: HashMap::new(),
         };
-        let mut simulation = Simulation::new(config, sender);
+        let mut simulation = Simulation::new(config, sender, receiver);
         simulation.execute()?;
         assert_eq!(simulation.interaction_count, 1);
         Ok(())

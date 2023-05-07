@@ -1,10 +1,11 @@
-use egui::{
-    plot::{Bar, BarChart, Plot},
-    Color32,
-};
 use std::thread;
 
-use crate::{simulation::Simulation, App, State};
+use egui::plot::{Bar, BarChart, Legend, Plot};
+
+use crate::{
+    simulation::{Simulation, SimulationMessage},
+    App, State,
+};
 
 /// GUI implementation via egui and eframe.
 impl eframe::App for App {
@@ -16,30 +17,21 @@ impl eframe::App for App {
                 ui.add(
                     egui::Slider::new(&mut self.config.agent_count, 2..=100000000)
                         .text("Number of Agents")
-                        .logarithmic(true),
+                        .logarithmic(true)
+                        .trailing_fill(true),
                 );
                 ui.add(
-                    egui::Slider::new(&mut self.config.sample_size, 2..=255).text("Sample Size"),
+                    egui::Slider::new(&mut self.config.sample_size, 2..=255)
+                        .text("Sample Size")
+                        .trailing_fill(true),
                 );
                 ui.add(
                     egui::Slider::new(&mut self.config.opinion_count, 2..=10)
-                        .text("Number of Opinions"),
+                        .text("Number of Opinions")
+                        .trailing_fill(true),
                 );
-                if ui.button("Start simulation").clicked() {
-                    self.state = State::Simulation;
-
-                    // Execute the simulation on another thread.
-                    for sender in &self.senders {
-                        let sender = sender.clone();
-                        let config = self.config.clone();
-                        thread::spawn(move || {
-                            let mut simulation = Simulation::new(config, sender);
-                            simulation.execute().unwrap();
-                        });
-                    }
-                }
             });
-            egui::TopBottomPanel::bottom("opinion_distribution_configuration").show(ctx, |ui| {
+            egui::TopBottomPanel::top("opinion_distribution_configuration").show(ctx, |ui| {
                 ui.set_enabled(self.state.eq(&State::Config));
                 ui.heading("Opinion distribution");
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -49,7 +41,8 @@ impl eframe::App for App {
                                 self.config.weights.entry(opinion).or_insert(1),
                                 0..=5,
                             )
-                            .vertical(),
+                            .vertical()
+                            .trailing_fill(true),
                         );
                     }
                     // Remove old opinion distribution entries. Otherwise a decrease in opinion
@@ -59,33 +52,59 @@ impl eframe::App for App {
                     }
                 });
             });
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.set_enabled(self.state.eq(&State::Simulation));
+            egui::CentralPanel::default().show(ctx, |_ui| {
                 egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
                     ui.heading("Simulation");
-                    let finished = self
-                        .simulations
-                        .iter()
-                        .all(|sim| sim.lock().unwrap().finished);
-                    ui.set_enabled(finished);
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        // ui.label(format!(
-                        //     "Number of interactions: {}",
-                        //     simulation.interaction_count
-                        // ));
-                        if ui
-                            .button("Simulations finished. Click to simulate again!")
-                            .clicked()
-                        {
-                            // Reset the simulations. This way we keep the communication with the
-                            // simulation thread open.
-                            for simulation in self.simulations.iter() {
-                                let mut simulation = simulation.lock().unwrap();
-                                simulation.opinion_distribution.clear();
-                                simulation.finished = false;
+                        ui.add_enabled_ui(self.state.eq(&State::Config), |ui| {
+                            if ui.button("Start").clicked() {
+                                self.state = State::Simulation;
+
+                                // Execute the simulation on another thread.
+                                for sender in &self.senders {
+                                    let sender = sender.clone();
+                                    let config = self.config.clone();
+                                    let receiver = self.broadcast.subscribe();
+                                    thread::spawn(move || {
+                                        let mut simulation = Simulation::new(config, sender);
+                                        simulation.execute(receiver).unwrap();
+                                    });
+                                }
                             }
-                            self.state = State::Config;
-                        }
+                        });
+                        ui.add_enabled_ui(self.state.eq(&State::Simulation), |ui| {
+                            let finished = self
+                                .simulations
+                                .iter()
+                                .all(|sim| sim.lock().unwrap().finished);
+                            ui.add_enabled_ui(!finished, |ui| {
+                                if ui.toggle_value(&mut self.paused, "Pause").clicked() {
+                                    match self.paused {
+                                        true => {
+                                            self.broadcast.send(SimulationMessage::Pause).unwrap()
+                                        }
+                                        false => {
+                                            self.broadcast.send(SimulationMessage::Play).unwrap()
+                                        }
+                                    };
+                                }
+                                if ui.button("Abort").clicked() {
+                                    self.broadcast.send(SimulationMessage::Abort).unwrap();
+                                }
+                            });
+                            ui.add_enabled_ui(finished, |ui| {
+                                if ui.button("Repeat").clicked() {
+                                    // Reset the simulations. This way we keep the communication with the
+                                    // simulation thread open.
+                                    for simulation in self.simulations.iter() {
+                                        let mut simulation = simulation.lock().unwrap();
+                                        simulation.opinion_distribution.clear();
+                                        simulation.finished = false;
+                                    }
+                                    self.state = State::Config;
+                                }
+                            });
+                        });
                     });
                 });
                 egui::CentralPanel::default().show(ctx, |ui| {
@@ -108,15 +127,18 @@ impl eframe::App for App {
                                 })
                                 .collect(),
                         )
-                        .color(Color32::WHITE);
+                        .name(self.formatter.format(simulation.interaction_count as f64));
+
                         charts.push(chart);
                     }
 
-                    Plot::new("chart").show(ui, |plot_ui| {
-                        for chart in charts {
-                            plot_ui.bar_chart(chart);
-                        }
-                    });
+                    Plot::new("chart")
+                        .legend(Legend::default().background_alpha(1.0))
+                        .show(ui, |plot_ui| {
+                            for chart in charts {
+                                plot_ui.bar_chart(chart);
+                            }
+                        });
                 });
             });
         });
