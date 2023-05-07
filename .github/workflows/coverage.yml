@@ -14,8 +14,8 @@ jobs:
 
       - name:                   Generate code coverage
         run: |
-          cd simulation/simulation-cli/
-          cargo tarpaulin --verbose --all-features --include-tests --out Xml
+          cd simulation/
+          cargo tarpaulin --verbose --all-features --include-tests --exclude-files src/ui/* --out Xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
