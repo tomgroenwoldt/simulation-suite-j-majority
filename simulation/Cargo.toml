@@ -8,8 +8,11 @@ authors = ["Tom Groenwoldt <tom.groenwoldt@tuhh.de>"]
 [dependencies]
 eframe = "0.21.3"
 egui = "0.21.0"
+futures = "0.3.28"
+human_format = "1.0.3"
 rand = "0.8.5"
 rstest = "0.17.0"
 thiserror = "1.0.40"
+tokio = { version = "1.28.0", features = ["sync"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
