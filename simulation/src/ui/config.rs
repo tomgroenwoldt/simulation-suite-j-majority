@@ -1,31 +1,38 @@
-use egui::Ui;
+use egui::{global_dark_light_mode_buttons, Layout, Ui};
 
 use crate::{App, State};
 
 pub fn render_config(ui: &mut Ui, app: &mut App) {
-    ui.set_enabled(app.state.eq(&State::Config));
     ui.heading("Configuration");
-    ui.add(
-        egui::Slider::new(&mut app.config.agent_count, 2..=100000000)
-            .text("Number of Agents")
-            .logarithmic(true)
-            .trailing_fill(true),
-    );
-    ui.add(
-        egui::Slider::new(&mut app.config.sample_size, 2..=255)
-            .text("Sample Size")
-            .trailing_fill(true),
-    );
-    ui.add(
-        egui::Slider::new(&mut app.config.opinion_count, 2..=10)
-            .text("Number of Opinions")
-            .trailing_fill(true),
-    );
-    ui.add(
-        egui::Slider::new(&mut app.config.simulation_count, 1..=100)
-            .text("Number of Simulations")
-            .trailing_fill(true),
-    );
+    ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
+        ui.with_layout(Layout::top_down(egui::Align::Min), |ui| {
+            ui.set_enabled(app.state.eq(&State::Config));
+            ui.add(
+                egui::Slider::new(&mut app.config.agent_count, 2..=100000000)
+                    .text("Number of Agents")
+                    .logarithmic(true)
+                    .trailing_fill(true),
+            );
+            ui.add(
+                egui::Slider::new(&mut app.config.sample_size, 2..=255)
+                    .text("Sample Size")
+                    .trailing_fill(true),
+            );
+            ui.add(
+                egui::Slider::new(&mut app.config.opinion_count, 2..=10)
+                    .text("Number of Opinions")
+                    .trailing_fill(true),
+            );
+            ui.add(
+                egui::Slider::new(&mut app.config.simulation_count, 1..=100)
+                    .text("Number of Simulations")
+                    .trailing_fill(true),
+            );
+        });
+        ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+            global_dark_light_mode_buttons(ui);
+        });
+    });
 }
 
 pub fn render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
