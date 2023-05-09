@@ -21,6 +21,11 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
             .text("Number of Opinions")
             .trailing_fill(true),
     );
+    ui.add(
+        egui::Slider::new(&mut app.config.simulation_count, 1..=100)
+            .text("Number of Simulations")
+            .trailing_fill(true),
+    );
 }
 
 pub fn render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {

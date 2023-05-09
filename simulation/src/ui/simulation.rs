@@ -2,10 +2,13 @@ use egui::{
     plot::{Bar, BarChart, Legend, Plot},
     Context,
 };
-use std::thread;
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    thread,
+};
 
 use crate::{
-    simulation::{Simulation, SimulationMessage},
+    simulation::{FrontendSimulation, Simulation, SimulationMessage},
     App, State,
 };
 
@@ -16,11 +19,50 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
             ui.add_enabled_ui(app.state.eq(&State::Config), |ui| {
                 if ui.button("Start").clicked() {
                     app.state = State::Simulation;
-                    // Execute the simulation on another thread.
+                    let mut simulations = vec![];
+                    let mut senders = vec![];
+                    // Create worker threads which are listening to simulation messages.
+                    // Each simulation has one assigned worker thread.
+                    for _ in 0..app.config.simulation_count {
+                        let (sender, receiver) = mpsc::sync_channel::<SimulationMessage>(1000);
+
+                        let frontend_simulation =
+                            Arc::new(Mutex::new(FrontendSimulation::default()));
+                        let frontend_simulation_clone = Arc::clone(&frontend_simulation);
+                        simulations.push(frontend_simulation);
+                        senders.push(sender);
+
+                        // Message handler which communicates with the simulation thread.
+                        thread::spawn(move || loop {
+                            if let Ok(msg) = receiver.recv() {
+                                let mut simulation = frontend_simulation_clone.lock().unwrap();
+                                match msg {
+                                    SimulationMessage::Update((
+                                        old,
+                                        new,
+                                        new_interaction_count,
+                                    )) => {
+                                        simulation.opinion_distribution.update(old, new);
+                                        simulation.interaction_count = new_interaction_count;
+                                    }
+                                    SimulationMessage::Finish => {
+                                        simulation.finished = true;
+                                        return;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        });
+                    }
+                    app.senders = senders;
+                    app.simulations = simulations;
+
+                    // Execute simulations on assigned threads.
                     for sender in &app.senders {
                         let sender = sender.clone();
                         let config = app.config.clone();
                         let receiver = app.broadcast.subscribe();
+
                         thread::spawn(move || {
                             let mut simulation = Simulation::new(config, sender);
                             simulation.execute(receiver).unwrap();
@@ -28,13 +70,17 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
                     }
                 }
             });
+
             ui.add_enabled_ui(app.state.eq(&State::Simulation), |ui| {
                 let finished = app
                     .simulations
                     .iter()
                     .all(|sim| sim.lock().unwrap().finished);
                 ui.add_enabled_ui(!finished, |ui| {
-                    if ui.toggle_value(&mut app.paused, "Pause").clicked() {
+                    if ui
+                        .toggle_value(&mut app.paused, "Pause (experimental)")
+                        .clicked()
+                    {
                         match app.paused {
                             true => app.broadcast.send(SimulationMessage::Pause).unwrap(),
                             false => app.broadcast.send(SimulationMessage::Play).unwrap(),
@@ -47,14 +93,8 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
                 });
                 ui.add_enabled_ui(finished, |ui| {
                     if ui.button("Repeat").clicked() {
-                        // Reset the simulations. This way we keep the communication with the
-                        // simulation thread open.
-                        for simulation in app.simulations.iter() {
-                            app.broadcast.send(SimulationMessage::Finish).unwrap();
-                            let mut simulation = simulation.lock().unwrap();
-                            simulation.opinion_distribution.clear();
-                            simulation.finished = false;
-                        }
+                        app.broadcast.send(SimulationMessage::Finish).unwrap();
+                        app.simulations.clear();
                         app.state = State::Config;
                     }
                 });
@@ -66,6 +106,7 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
 pub fn render_simulation_charts(ctx: &Context, app: &mut App) {
     egui::CentralPanel::default().show(ctx, |ui| {
         let mut charts = vec![];
+        let mut interaction_counts = vec![];
         for (index, simulation) in app.simulations.iter().enumerate() {
             let simulation = simulation.lock().unwrap();
             let chart = BarChart::new(
@@ -85,13 +126,27 @@ pub fn render_simulation_charts(ctx: &Context, app: &mut App) {
             .name(app.formatter.format(simulation.interaction_count as f64));
 
             charts.push(chart);
+            interaction_counts.push(simulation.interaction_count);
         }
 
+        let average_interaction_count = if let Some(average_interaction_count) = interaction_counts
+            .iter()
+            .sum::<u64>()
+            .checked_div(interaction_counts.len() as u64)
+        {
+            average_interaction_count
+        } else {
+            0
+        };
+        // Format the number into a human readable string.
+        let human_number = app.formatter.format(average_interaction_count as f64);
+
         Plot::new("chart")
-            .legend(Legend::default().background_alpha(1.0))
+            .legend(Legend::default())
             .show(ui, |plot_ui| {
                 for chart in charts {
-                    plot_ui.bar_chart(chart);
+                    plot_ui
+                        .bar_chart(chart.name(format!("Average interactions: {}", human_number)));
                 }
             });
     });
