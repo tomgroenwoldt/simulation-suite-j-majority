@@ -6,6 +6,7 @@ pub struct Config {
     pub sample_size: u8,
     pub opinion_count: u8,
     pub weights: HashMap<u8, u8>,
+    pub simulation_count: u8,
 }
 
 impl Default for Config {
@@ -15,6 +16,7 @@ impl Default for Config {
             sample_size: 2,
             opinion_count: 2,
             weights: HashMap::new(),
+            simulation_count: 1,
         }
     }
 }

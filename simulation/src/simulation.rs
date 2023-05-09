@@ -261,6 +261,7 @@ mod simulation {
             sample_size: 5,
             opinion_count: 1,
             weights: HashMap::new(),
+            simulation_count: 1,
         };
         let mut simulation = Simulation::new(config, sender());
         simulation.execute(receiver())?;
@@ -279,6 +280,7 @@ mod simulation {
             sample_size: 2,
             opinion_count,
             weights: HashMap::new(),
+            simulation_count: 1,
         };
         let mut simulation = Simulation::new(config, sender());
         simulation.execute(receiver())?;
