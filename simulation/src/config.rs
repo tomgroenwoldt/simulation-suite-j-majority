@@ -16,7 +16,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             agent_count: 100000,
-            sample_size: 2,
+            sample_size: 3,
             opinion_count: 2,
             weights: HashMap::new(),
             simulation_count: 1,
