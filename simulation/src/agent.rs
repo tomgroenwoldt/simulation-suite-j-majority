@@ -18,7 +18,7 @@ impl Agent {
     pub fn update(
         &mut self,
         agents: &Vec<Agent>,
-        interaction_count: &mut u64,
+        interaction_count: Option<&mut u64>,
     ) -> Result<u8, AppError> {
         // If the sample is empty, do not update the
         // agent opinion and return early.
@@ -30,7 +30,6 @@ impl Agent {
         let mut counts = HashMap::new();
 
         // Find the major opinions in the given sample.
-        // TODO: Investigate if there is a less complex approach.
         agents.iter().for_each(|agent| {
             *counts.entry(agent.opinion).or_insert(0) += 1;
         });
@@ -45,7 +44,9 @@ impl Agent {
         // Safe to unwrap as we check agents for emptiness.
         let major_opinion = major_opinions.choose(&mut rand::thread_rng()).unwrap();
         self.opinion = *major_opinion;
-        *interaction_count += 1;
+        if let Some(interaction_count) = interaction_count {
+            *interaction_count += 1;
+        }
 
         Ok(*major_opinion)
     }
@@ -90,7 +91,7 @@ mod agent {
         let mut interaction_count = 0;
         agent.update(
             &[random_agents, fixed_agents].concat(),
-            &mut interaction_count,
+            Some(&mut interaction_count),
         )?;
 
         // The major opinion should always be 0.
@@ -123,7 +124,7 @@ mod agent {
         let mut interaction_count = 0;
         agent.update(
             &[random_agents, fixed_agents].concat(),
-            &mut interaction_count,
+            Some(&mut interaction_count),
         )?;
 
         // The updated opinion should be equal to one of
@@ -140,7 +141,7 @@ mod agent {
         let empty_sample = vec![];
         let mut interaction_count = 0;
 
-        let result = agent.update(&empty_sample, &mut interaction_count);
+        let result = agent.update(&empty_sample, Some(&mut interaction_count));
         assert!(result.is_err());
         assert_eq!(agent.opinion, 0);
         assert_eq!(interaction_count, 0);
