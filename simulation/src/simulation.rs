@@ -190,7 +190,7 @@ impl Simulation {
                 let old_agents = self.agents.clone();
                 for chosen_agent in self.agents.iter_mut() {
                     if Simulation::handle_state(lock, &self.sender, cvar)? {
-                        break;
+                        return Ok(());
                     }
 
                     let sample = old_agents
