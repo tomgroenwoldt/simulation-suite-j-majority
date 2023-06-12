@@ -1,14 +1,14 @@
-use futures::executor::block_on;
-use rand::{
-    distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
-};
 use std::{
     collections::HashMap,
     sync::{mpsc::SyncSender, Arc, Condvar, Mutex},
     thread,
 };
+
+use futures::executor::block_on;
+use rand::{
+    distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
+};
 use tokio::sync::broadcast::Receiver;
-use tracing::{error, info};
 
 use crate::{agent::Agent, error::AppError, Config};
 
@@ -51,6 +51,7 @@ pub struct Simulation {
     /// State and condition variable, which can block the executor thread
     /// of the simulation.
     pub state: Arc<(Mutex<SimulationState>, Condvar)>,
+    pub model: SimulationModel,
 }
 
 #[derive(Debug, PartialEq)]
@@ -69,6 +70,12 @@ pub enum SimulationMessage {
     Finish,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimulationModel {
+    Population,
+    Gossip,
+}
+
 #[derive(Debug, Default)]
 pub struct FrontendSimulation {
     pub opinion_distribution: OpinionDistribution,
@@ -82,7 +89,7 @@ impl Simulation {
         let mut agents = vec![];
         let mut opinion_distribution = OpinionDistribution::default();
         let weighted_index = WeightedIndex::new(config.weights.into_values().collect::<Vec<_>>())
-            .unwrap_or(WeightedIndex::new(vec![1; config.opinion_count as usize]).unwrap());
+            .expect("Error trying to create weighted index for simulation.");
         let choices = (0..config.opinion_count).collect::<Vec<_>>();
 
         // Create agents with random opinions and generate the opinion
@@ -91,16 +98,11 @@ impl Simulation {
             let new_opinion = choices[weighted_index.sample(&mut rng)];
 
             opinion_distribution.update(None, new_opinion);
-            if sender
+            sender
                 .send(SimulationMessage::Update((None, new_opinion, 0)))
-                .is_err()
-            {
-                error!("Error sending initial simulation updates to egui!");
-            }
+                .expect("Error sending initial simulation updates to egui!");
             agents.push(Agent::new(new_opinion));
         }
-
-        info!("Agent initilization finished!");
 
         Simulation {
             agents,
@@ -110,6 +112,7 @@ impl Simulation {
             interaction_count: 0,
             sender,
             state: Arc::new((Mutex::new(SimulationState::Play), Condvar::new())),
+            model: config.model,
         }
     }
 
@@ -121,7 +124,6 @@ impl Simulation {
             return Ok(());
         }
         let mut receiver = receiver.resubscribe();
-
         let state = Arc::clone(&self.state);
 
         // Message handler which communicates with the GUI.
@@ -151,57 +153,78 @@ impl Simulation {
 
         let mut rng = rand::thread_rng();
         let (lock, cvar) = &*self.state;
+        let agent_count: u64 = self.agents.len() as u64;
 
-        loop {
-            let mut state = lock.lock().unwrap();
-            if state.eq(&SimulationState::Exit) {
-                if self.sender.send(SimulationMessage::Finish).is_err() {
-                    error!("Error sending simulation the finish message.");
+        match self.model {
+            SimulationModel::Population => loop {
+                if Simulation::handle_state(lock, &self.sender, cvar)? {
+                    break;
                 }
-                break;
-            }
-            // Do nothing on pause
-            while state.eq(&SimulationState::Pause) {
-                state = cvar.wait(state).unwrap();
-            }
-            drop(state);
-            let (chosen_agent, sample) =
-                Simulation::prepare_interaction(&mut self.agents, self.j, &mut rng)?;
-            let old_opinion = chosen_agent.opinion;
 
-            // Update agent opinion and set new opinion distribution.
-            let new_opinion = chosen_agent.update(&sample, &mut self.interaction_count)?;
-            let updated_opinion_count = self
-                .opinion_distribution
-                .update(Some(old_opinion), new_opinion);
-            if self
-                .sender
-                .send(SimulationMessage::Update((
+                let (chosen_agent, sample) =
+                    Simulation::prepare_population_interaction(&mut self.agents, self.j, &mut rng)?;
+                let old_opinion = chosen_agent.opinion;
+
+                // Update agent opinion and set new opinion distribution.
+                let new_opinion =
+                    chosen_agent.update(&sample, Some(&mut self.interaction_count))?;
+                let updated_opinion_count = self
+                    .opinion_distribution
+                    .update(Some(old_opinion), new_opinion);
+                self.sender.send(SimulationMessage::Update((
                     Some(old_opinion),
                     new_opinion,
                     self.interaction_count,
-                )))
-                .is_err()
-            {
-                error!("Error sending simulation updates to egui!");
-            }
+                )))?;
 
-            // Exit simulation if all agents agree on one opinion.
-            if updated_opinion_count.eq(&(self.agents.len() as u64)) {
-                info!(
-                    "Agents reached consensus with {} interactions!",
-                    self.interaction_count
-                );
-                let mut state = lock.lock().unwrap();
-                *state = SimulationState::Exit;
-            }
-        }
+                // Exit simulation if all agents agree on one opinion.
+                if updated_opinion_count.eq(&agent_count) {
+                    let mut state = lock.lock().unwrap();
+                    *state = SimulationState::Exit;
+                }
+            },
+
+            SimulationModel::Gossip => loop {
+                // Every iteration of the for loop operates on the opinion distribution
+                // of the last step.
+                let old_agents = self.agents.clone();
+                for chosen_agent in self.agents.iter_mut() {
+                    if Simulation::handle_state(lock, &self.sender, cvar)? {
+                        break;
+                    }
+
+                    let sample = old_agents
+                        .choose_multiple(&mut rng, self.j as usize)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    let old_opinion = chosen_agent.opinion;
+
+                    // Update opinion of agent without increasing the interaction count.
+                    let new_opinion = chosen_agent.update(&sample, None)?;
+                    let updated_opinion_count = self
+                        .opinion_distribution
+                        .update(Some(old_opinion), new_opinion);
+                    self.sender.send(SimulationMessage::Update((
+                        Some(old_opinion),
+                        new_opinion,
+                        self.interaction_count,
+                    )))?;
+
+                    // Exit simulation if all agents agree on one opinion.
+                    if updated_opinion_count.eq(&agent_count) {
+                        let mut state = lock.lock().unwrap();
+                        *state = SimulationState::Exit;
+                    }
+                }
+                self.interaction_count += 1;
+            },
+        };
         Ok(())
     }
 
-    /// Chooses and returns a agent uniformly at random as well as a sample of
+    /// Chooses and returns an agent uniformly at random as well as a sample of
     /// given size.
-    pub fn prepare_interaction<'a>(
+    fn prepare_population_interaction<'a>(
         agents: &'a mut Vec<Agent>,
         sample_size: u8,
         rng: &mut ThreadRng,
@@ -222,6 +245,25 @@ impl Simulation {
             .collect::<Vec<_>>();
 
         Ok((chosen_agent, sample))
+    }
+
+    fn handle_state(
+        lock: &Mutex<SimulationState>,
+        sender: &SyncSender<SimulationMessage>,
+        cvar: &Condvar,
+    ) -> Result<bool, AppError> {
+        let mut state = lock.lock().unwrap();
+        if state.eq(&SimulationState::Exit) {
+            sender.send(SimulationMessage::Finish)?;
+            return Ok(true);
+        }
+        // Do nothing on pause
+        while state.eq(&SimulationState::Pause) {
+            state = cvar.wait(state).unwrap();
+        }
+        drop(state);
+
+        Ok(false)
     }
 }
 
@@ -260,8 +302,7 @@ mod simulation {
             agent_count: 10,
             sample_size: 5,
             opinion_count: 1,
-            weights: HashMap::new(),
-            simulation_count: 1,
+            ..Default::default()
         };
         let mut simulation = Simulation::new(config, sender());
         simulation.execute(receiver())?;
@@ -279,8 +320,7 @@ mod simulation {
             agent_count: 2,
             sample_size: 2,
             opinion_count,
-            weights: HashMap::new(),
-            simulation_count: 1,
+            ..Default::default()
         };
         let mut simulation = Simulation::new(config, sender());
         simulation.execute(receiver())?;
@@ -292,7 +332,7 @@ mod simulation {
     fn prepare_with_empty_agents_leads_to_err() -> Result<(), AppError> {
         let mut agents = vec![];
         let mut rng = rand::thread_rng();
-        let result = Simulation::prepare_interaction(&mut agents, 10, &mut rng);
+        let result = Simulation::prepare_population_interaction(&mut agents, 10, &mut rng);
         assert!(result.is_err());
         Ok(())
     }

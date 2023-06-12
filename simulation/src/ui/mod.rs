@@ -2,7 +2,7 @@ use self::{
     config::{render_config, render_opinion_distribution_config},
     simulation::{render_simulation_charts, render_simulation_header},
 };
-use crate::App;
+use crate::{error::AppError, App};
 
 pub mod config;
 pub mod simulation;
@@ -18,8 +18,9 @@ impl eframe::App for App {
                 render_opinion_distribution_config(ui, self);
             });
             egui::CentralPanel::default().show(ctx, |_ui| {
-                render_simulation_header(ctx, self);
+                render_simulation_header(ctx, self)?;
                 render_simulation_charts(ctx, self);
+                Ok::<(), AppError>(())
             });
         });
     }

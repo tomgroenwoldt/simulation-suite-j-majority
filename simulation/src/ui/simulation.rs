@@ -6,13 +6,15 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
 };
+use tracing::error;
 
 use crate::{
+    error::AppError,
     simulation::{FrontendSimulation, Simulation, SimulationMessage},
     App, State,
 };
 
-pub fn render_simulation_header(ctx: &Context, app: &mut App) {
+pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppError> {
     egui::TopBottomPanel::top("simulation_header").show(ctx, |ui| {
         ui.heading("Simulation");
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -65,7 +67,10 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
 
                         thread::spawn(move || {
                             let mut simulation = Simulation::new(config, sender);
-                            simulation.execute(receiver).unwrap();
+                            match simulation.execute(receiver) {
+                                Ok(_) => {}
+                                Err(e) => error!("Error while executing simulation: {e}"),
+                            }
                         });
                     }
                 }
@@ -82,25 +87,28 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) {
                         .clicked()
                     {
                         match app.paused {
-                            true => app.broadcast.send(SimulationMessage::Pause).unwrap(),
-                            false => app.broadcast.send(SimulationMessage::Play).unwrap(),
+                            true => app.broadcast.send(SimulationMessage::Pause)?,
+                            false => app.broadcast.send(SimulationMessage::Play)?,
                         };
                     }
                     if ui.button("Abort").clicked() {
-                        app.broadcast.send(SimulationMessage::Abort).unwrap();
+                        app.broadcast.send(SimulationMessage::Abort)?;
                         app.paused = false;
                     }
+                    Ok::<_, AppError>(())
                 });
                 ui.add_enabled_ui(finished, |ui| {
-                    if ui.button("Repeat").clicked() {
-                        app.broadcast.send(SimulationMessage::Finish).unwrap();
+                    if ui.button("Reset").clicked() {
+                        app.broadcast.send(SimulationMessage::Finish)?;
                         app.simulations.clear();
                         app.state = State::Config;
                     }
+                    Ok::<_, AppError>(())
                 });
             });
         });
     });
+    Ok(())
 }
 
 pub fn render_simulation_charts(ctx: &Context, app: &mut App) {
