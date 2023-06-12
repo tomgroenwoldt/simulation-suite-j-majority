@@ -1,6 +1,6 @@
 use egui::{global_dark_light_mode_buttons, Layout, Ui};
 
-use crate::{App, State};
+use crate::{simulation::SimulationModel, App, State};
 
 pub fn render_config(ui: &mut Ui, app: &mut App) {
     ui.heading("Configuration");
@@ -28,6 +28,18 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
                     .text("Number of Simulations")
                     .trailing_fill(true),
             );
+            ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
+                ui.selectable_value(
+                    &mut app.config.model,
+                    SimulationModel::Population,
+                    "Population model",
+                );
+                ui.selectable_value(
+                    &mut app.config.model,
+                    SimulationModel::Gossip,
+                    "Gossip model",
+                );
+            });
         });
         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
             global_dark_light_mode_buttons(ui);
