@@ -110,7 +110,7 @@ impl Simulation {
             agents,
             j: config.sample_size,
             k: 2,
-            upper_bound_k: config.opinion_count,
+            upper_bound_k: config.opinion_count + 1,
             opinion_distribution,
             interaction_count: 0,
             sender,
