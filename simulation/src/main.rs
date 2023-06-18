@@ -3,6 +3,7 @@ extern crate human_format;
 use config::Config;
 use eframe::NativeOptions;
 use error::AppError;
+use export::SimulationExport;
 use human_format::Formatter;
 use simulation::{FrontendSimulation, SimulationMessage};
 use std::{
@@ -12,11 +13,12 @@ use std::{
 };
 use tokio::sync::broadcast::{self, Sender};
 
-pub mod agent;
-pub mod config;
-pub mod error;
-pub mod simulation;
-pub mod ui;
+mod agent;
+mod config;
+mod error;
+mod export;
+mod simulation;
+mod ui;
 
 pub struct App {
     state: State,
@@ -26,6 +28,7 @@ pub struct App {
     broadcast: Sender<SimulationMessage>,
     paused: bool,
     formatter: Formatter,
+    export: SimulationExport,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -60,6 +63,7 @@ impl App {
             broadcast,
             paused: false,
             formatter,
+            export: SimulationExport::default(),
         }
     }
 }

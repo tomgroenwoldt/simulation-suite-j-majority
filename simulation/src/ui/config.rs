@@ -20,7 +20,7 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
                     .trailing_fill(true),
             );
             ui.add(
-                egui::Slider::new(&mut app.config.opinion_count, 2..=10)
+                egui::Slider::new(&mut app.config.opinion_count, 2..=50)
                     .text("Number of Opinions")
                     .trailing_fill(true),
             );
@@ -49,7 +49,8 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
 }
 
 pub fn render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
-    ui.set_enabled(app.state.eq(&State::Config));
+    // ui.set_enabled(app.state.eq(&State::Config));
+    ui.set_enabled(false);
     ui.heading("Opinion distribution");
     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
         for opinion in 0..app.config.opinion_count {

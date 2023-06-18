@@ -5,12 +5,10 @@ use std::{
 };
 
 use futures::executor::block_on;
-use rand::{
-    distributions::WeightedIndex, prelude::Distribution, rngs::ThreadRng, seq::SliceRandom, Rng,
-};
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use tokio::sync::broadcast::Receiver;
 
-use crate::{agent::Agent, error::AppError, Config};
+use crate::{agent::Agent, error::AppError, export::SimulationExport, Config};
 
 #[derive(Debug, Default, Clone)]
 pub struct OpinionDistribution {
@@ -29,10 +27,6 @@ impl OpinionDistribution {
             .or_insert_with(|| 1);
         updated_count
     }
-
-    pub fn clear(&mut self) {
-        self.map.clear();
-    }
 }
 
 #[derive(Debug)]
@@ -43,6 +37,7 @@ pub struct Simulation {
     pub j: u8,
     /// The amount of different opinions.
     pub k: u8,
+    pub upper_bound_k: u8,
     /// Counts the interactions of all agents.
     pub interaction_count: u64,
     /// Stores number of occurences for each opinion.
@@ -52,12 +47,15 @@ pub struct Simulation {
     /// of the simulation.
     pub state: Arc<(Mutex<SimulationState>, Condvar)>,
     pub model: SimulationModel,
+    /// Stores the initial config for resetting purposes.
+    pub config: Config,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum SimulationState {
     Pause,
     Play,
+    ReadyForNext,
     Exit,
 }
 
@@ -67,6 +65,7 @@ pub enum SimulationMessage {
     Play,
     Abort,
     Update((Option<u8>, u8, u64)),
+    Next,
     Finish,
 }
 
@@ -81,6 +80,7 @@ pub struct FrontendSimulation {
     pub opinion_distribution: OpinionDistribution,
     pub interaction_count: u64,
     pub finished: bool,
+    pub export: SimulationExport,
 }
 
 impl Simulation {
@@ -88,31 +88,65 @@ impl Simulation {
         let mut rng = rand::thread_rng();
         let mut agents = vec![];
         let mut opinion_distribution = OpinionDistribution::default();
-        let weighted_index = WeightedIndex::new(config.weights.into_values().collect::<Vec<_>>())
-            .expect("Error trying to create weighted index for simulation.");
-        let choices = (0..config.opinion_count).collect::<Vec<_>>();
+        let config_clone = config.clone();
+        // let weighted_index = WeightedIndex::new(config.weights.into_values().collect::<Vec<_>>())
+        //     .expect("Error trying to create weighted index for simulation.");
+
+        // We start with the case of k = 2.
+        let choices = (0..2).collect::<Vec<u8>>();
 
         // Create agents with random opinions and generate the opinion
         // distribution.
         for _ in 0..config.agent_count {
-            let new_opinion = choices[weighted_index.sample(&mut rng)];
+            let new_opinion = choices.choose(&mut rng).unwrap();
 
-            opinion_distribution.update(None, new_opinion);
+            opinion_distribution.update(None, *new_opinion);
             sender
-                .send(SimulationMessage::Update((None, new_opinion, 0)))
+                .send(SimulationMessage::Update((None, *new_opinion, 0)))
                 .expect("Error sending initial simulation updates to egui!");
-            agents.push(Agent::new(new_opinion));
+            agents.push(Agent::new(*new_opinion));
         }
-
         Simulation {
             agents,
             j: config.sample_size,
-            k: config.opinion_count,
+            k: 2,
+            upper_bound_k: config.opinion_count,
             opinion_distribution,
             interaction_count: 0,
             sender,
             state: Arc::new((Mutex::new(SimulationState::Play), Condvar::new())),
-            model: config.model,
+            model: config.model.clone(),
+            config: config_clone,
+        }
+    }
+
+    pub fn prepare_next(
+        config: Config,
+        agents: &mut Vec<Agent>,
+        opinion_distribution: &mut OpinionDistribution,
+        interaction_count: &mut u64,
+        k: &mut u8,
+        sender: &mut SyncSender<SimulationMessage>,
+    ) {
+        let mut rng = rand::thread_rng();
+        *agents = vec![];
+        *opinion_distribution = OpinionDistribution::default();
+        *interaction_count = 0;
+        *k += 1;
+        // let weighted_index = WeightedIndex::new(config.weights.into_values().collect::<Vec<_>>())
+        //     .expect("Error trying to create weighted index for simulation.");
+        let choices = (0..*k).collect::<Vec<_>>();
+
+        // Create agents with random opinions and generate the opinion
+        // distribution.
+        for _ in 0..config.agent_count {
+            let new_opinion = choices.choose(&mut rng).unwrap();
+
+            opinion_distribution.update(None, *new_opinion);
+            sender
+                .send(SimulationMessage::Update((None, *new_opinion, 0)))
+                .expect("Error sending initial simulation updates to egui!");
+            agents.push(Agent::new(*new_opinion));
         }
     }
 
@@ -177,10 +211,24 @@ impl Simulation {
                     self.interaction_count,
                 )))?;
 
-                // Exit simulation if all agents agree on one opinion.
                 if updated_opinion_count.eq(&agent_count) {
                     let mut state = lock.lock().unwrap();
-                    *state = SimulationState::Exit;
+                    // Exit simulation if we simulated all k, otherwise ready up for next run.
+                    if self.k.eq(&self.upper_bound_k) {
+                        *state = SimulationState::Exit;
+                    } else {
+                        *state = SimulationState::ReadyForNext;
+                        self.sender.send(SimulationMessage::Next)?;
+                        let config = self.config.clone();
+                        Simulation::prepare_next(
+                            config,
+                            &mut self.agents,
+                            &mut self.opinion_distribution,
+                            &mut self.interaction_count,
+                            &mut self.k,
+                            &mut self.sender,
+                        );
+                    }
                 }
             },
 
@@ -256,6 +304,10 @@ impl Simulation {
         if state.eq(&SimulationState::Exit) {
             sender.send(SimulationMessage::Finish)?;
             return Ok(true);
+        }
+        if state.eq(&SimulationState::ReadyForNext) {
+            *state = SimulationState::Play;
+            return Ok(false);
         }
         // Do nothing on pause
         while state.eq(&SimulationState::Pause) {

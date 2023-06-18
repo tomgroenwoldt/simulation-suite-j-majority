@@ -15,9 +15,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            agent_count: 100000,
+            agent_count: 10000,
             sample_size: 3,
-            opinion_count: 2,
+            opinion_count: 10,
             weights: HashMap::new(),
             simulation_count: 1,
             model: SimulationModel::Population,

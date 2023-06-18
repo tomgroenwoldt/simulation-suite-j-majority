@@ -6,11 +6,12 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     thread,
 };
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{
     error::AppError,
-    simulation::{FrontendSimulation, Simulation, SimulationMessage},
+    export::{OpinionPlot, SimulationExport},
+    simulation::{FrontendSimulation, OpinionDistribution, Simulation, SimulationMessage},
     App, State,
 };
 
@@ -30,28 +31,42 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
 
                         let frontend_simulation =
                             Arc::new(Mutex::new(FrontendSimulation::default()));
+                        info!(app.config.sample_size);
                         let frontend_simulation_clone = Arc::clone(&frontend_simulation);
                         simulations.push(frontend_simulation);
                         senders.push(sender);
 
                         // Message handler which communicates with the simulation thread.
-                        thread::spawn(move || loop {
-                            if let Ok(msg) = receiver.recv() {
-                                let mut simulation = frontend_simulation_clone.lock().unwrap();
-                                match msg {
-                                    SimulationMessage::Update((
-                                        old,
-                                        new,
-                                        new_interaction_count,
-                                    )) => {
-                                        simulation.opinion_distribution.update(old, new);
-                                        simulation.interaction_count = new_interaction_count;
+                        thread::spawn(move || {
+                            let mut plot = OpinionPlot::default();
+                            loop {
+                                if let Ok(msg) = receiver.recv() {
+                                    let mut simulation = frontend_simulation_clone.lock().unwrap();
+                                    match msg {
+                                        SimulationMessage::Update((
+                                            old,
+                                            new,
+                                            new_interaction_count,
+                                        )) => {
+                                            simulation.opinion_distribution.update(old, new);
+                                            simulation.interaction_count = new_interaction_count;
+                                        }
+                                        SimulationMessage::Next => {
+                                            let opinion_count =
+                                                simulation.opinion_distribution.map.len() as u8;
+                                            let interaction_count = simulation.interaction_count;
+                                            plot.points.push((opinion_count, interaction_count));
+                                            simulation.opinion_distribution =
+                                                OpinionDistribution::default();
+                                            simulation.interaction_count = 0;
+                                        }
+                                        SimulationMessage::Finish => {
+                                            simulation.export.plots.push(plot);
+                                            simulation.finished = true;
+                                            return;
+                                        }
+                                        _ => {}
                                     }
-                                    SimulationMessage::Finish => {
-                                        simulation.finished = true;
-                                        return;
-                                    }
-                                    _ => {}
                                 }
                             }
                         });
@@ -102,6 +117,37 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                         app.broadcast.send(SimulationMessage::Finish)?;
                         app.simulations.clear();
                         app.state = State::Config;
+                    }
+                    // if ui.button("Add to export").clicked() {
+                    //     let mut interaction_counts = vec![];
+                    //     for simulation in app.simulations.iter() {
+                    //         let simulation = simulation.lock().unwrap();
+                    //         interaction_counts.push(simulation.interaction_count);
+                    //     }
+                    //     let average_interaction_count = interaction_counts.iter().sum::<u64>()
+                    //         / interaction_counts.len() as u64;
+                    //     let plot = OpinionPlot::new(vec![(
+                    //         app.config.opinion_count,
+                    //         average_interaction_count,
+                    //     )]);
+                    //     app.export.plots.push(plot);
+                    // }
+
+                    if ui.button("Export").clicked() {
+                        // Calculate average of all plots.
+                        let mut exports = vec![];
+                        app.simulations.iter().for_each(|simulation| {
+                            let mut simulation = simulation.lock().unwrap();
+                            let sample_size = app.config.sample_size;
+                            simulation
+                                .export
+                                .plots
+                                .iter_mut()
+                                .for_each(|plot| plot.j = sample_size);
+                            exports.push(simulation.export.clone());
+                        });
+                        app.export.plots.push(SimulationExport::average(exports));
+                        app.export.to_pdf();
                     }
                     Ok::<_, AppError>(())
                 });

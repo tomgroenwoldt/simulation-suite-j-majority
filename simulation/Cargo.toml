@@ -10,6 +10,7 @@ eframe = "0.21.3"
 egui = "0.21.0"
 futures = "0.3.28"
 human_format = "1.0.3"
+pgfplots = { git = "https://github.com/tomgroenwoldt/pgfplots", branch = "add-marker-plot-key" }
 rand = "0.8.5"
 rstest = "0.17.0"
 thiserror = "1.0.40"
