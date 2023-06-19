@@ -89,6 +89,9 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                         });
                     }
                 }
+                if ui.button("Clear export").clicked() {
+                    app.export = SimulationExport::default();
+                }
             });
 
             ui.add_enabled_ui(app.state.eq(&State::Simulation), |ui| {
@@ -113,26 +116,11 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                     Ok::<_, AppError>(())
                 });
                 ui.add_enabled_ui(finished, |ui| {
-                    if ui.button("Reset").clicked() {
+                    if ui.button("Run new simulation").clicked() {
                         app.broadcast.send(SimulationMessage::Finish)?;
                         app.simulations.clear();
                         app.state = State::Config;
                     }
-                    // if ui.button("Add to export").clicked() {
-                    //     let mut interaction_counts = vec![];
-                    //     for simulation in app.simulations.iter() {
-                    //         let simulation = simulation.lock().unwrap();
-                    //         interaction_counts.push(simulation.interaction_count);
-                    //     }
-                    //     let average_interaction_count = interaction_counts.iter().sum::<u64>()
-                    //         / interaction_counts.len() as u64;
-                    //     let plot = OpinionPlot::new(vec![(
-                    //         app.config.opinion_count,
-                    //         average_interaction_count,
-                    //     )]);
-                    //     app.export.plots.push(plot);
-                    // }
-
                     if ui.button("Export").clicked() {
                         // Calculate average of all plots.
                         let mut exports = vec![];
