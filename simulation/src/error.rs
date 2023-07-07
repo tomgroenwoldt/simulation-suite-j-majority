@@ -14,4 +14,6 @@ pub enum AppError {
     BroadcastSendError(
         #[from] tokio::sync::broadcast::error::SendError<crate::simulation::SimulationMessage>,
     ),
+    #[error("Error exporting plots to CSV.")]
+    ExportError,
 }

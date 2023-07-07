@@ -20,8 +20,9 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
                     .trailing_fill(true),
             );
             ui.add(
-                egui::Slider::new(&mut app.config.opinion_count, 2..=50)
+                egui::Slider::new(&mut app.config.opinion_count, 2..=65535)
                     .text("Number of Opinions")
+                    .logarithmic(true)
                     .trailing_fill(true),
             );
             ui.add(
@@ -48,22 +49,22 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
     });
 }
 
-pub fn render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
+pub fn _render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
     // ui.set_enabled(app.state.eq(&State::Config));
     ui.set_enabled(false);
     ui.heading("Opinion distribution");
-    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-        for opinion in 0..app.config.opinion_count {
-            ui.add(
-                egui::Slider::new(app.config.weights.entry(opinion).or_insert(1), 0..=50)
-                    .vertical()
-                    .trailing_fill(true),
-            );
+    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |_ui| {
+        for _opinion in 0..app.config.opinion_count {
+            // ui.add(
+            //     egui::Slider::new(app.config.weights.entry(opinion).or_insert(1), 0..=50)
+            //         .vertical()
+            //         .trailing_fill(true),
+            // );
         }
         // Remove old opinion distribution entries. Otherwise a decrease in opinion
         // count via the GUI would result in a program crash.
-        for old in app.config.opinion_count..10 {
-            app.config.weights.remove_entry(&old);
+        for _old in app.config.opinion_count..10 {
+            // app.config.weights.remove_entry(&old);
         }
     });
 }

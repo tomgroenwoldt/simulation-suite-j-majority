@@ -16,13 +16,13 @@ pub struct SimulationExport {
 
 #[derive(Default, Debug, Clone)]
 pub struct OpinionPlot {
-    pub points: Vec<(u8, u64)>,
+    pub points: Vec<(u16, u64)>,
     pub j: u8,
 }
 
-impl Into<MarkShape> for &OpinionPlot {
-    fn into(self) -> MarkShape {
-        match self.j {
+impl From<&OpinionPlot> for MarkShape {
+    fn from(val: &OpinionPlot) -> Self {
+        match val.j {
             3 => MarkShape::Plus,
             4 => MarkShape::X,
             5 => MarkShape::Asterisk,
@@ -38,9 +38,9 @@ impl Into<MarkShape> for &OpinionPlot {
     }
 }
 
-impl Into<PlotKey> for &OpinionPlot {
-    fn into(self) -> PlotKey {
-        match self.j {
+impl From<&OpinionPlot> for PlotKey {
+    fn from(val: &OpinionPlot) -> Self {
+        match val.j {
             3 => PlotKey::Custom(String::from("color=red")),
             4 => PlotKey::Custom(String::from("color=green")),
             5 => PlotKey::Custom(String::from("color=blue")),
@@ -57,7 +57,7 @@ impl Into<PlotKey> for &OpinionPlot {
 }
 
 impl SimulationExport {
-    pub fn to_pdf(&mut self) {
+    pub fn generate_pdf(&mut self) {
         let mut plots = vec![];
         self.plots
             .sort_by(|plot_one, plot_two| plot_one.j.cmp(&plot_two.j));
@@ -72,7 +72,6 @@ impl SimulationExport {
                     pgf_point.into()
                 })
                 .collect();
-            // pgf_plot.add_key(PlotKey::Marker(Marker::new(MarkShape::OFilled, vec![])));
             pgf_plot.add_key(PlotKey::Marker(Marker::new(plot.into(), vec![])));
             pgf_plot.add_key(plot.into());
             pgf_plot.add_key(PlotKey::Type2D(pgfplots::axis::plot::Type2D::OnlyMarks));
@@ -88,10 +87,7 @@ impl SimulationExport {
             .collect::<Vec<_>>();
         entries.dedup();
         let entries = entries.join(",");
-        axis.add_key(AxisKey::Custom(String::from(format!(
-            "legend entries={{{}}}",
-            entries
-        ))));
+        axis.add_key(AxisKey::Custom(format!("legend entries={{{}}}", entries)));
         axis.add_key(AxisKey::Custom(String::from(
             "legend style={
         at={(0.5,1.05)}, % adjust the values to center the legend
@@ -100,28 +96,28 @@ impl SimulationExport {
         )));
         axis.add_key(AxisKey::Custom(String::from("legend columns=-1")));
         axis.add_key(AxisKey::Custom(String::from("nodes={inner sep=5pt}")));
+        axis.add_key(AxisKey::Custom(String::from("xmode=log")));
+        axis.add_key(AxisKey::Custom(String::from("log ticks with fixed point")));
         axis.plots = plots;
         info!("{}", axis.to_string());
         Picture::from(axis).show_pdf(Engine::PdfLatex).unwrap();
     }
 
-    pub fn average(exports: Vec<SimulationExport>) -> OpinionPlot {
-        let mut point_map: HashMap<u8, u64> = HashMap::new();
+    pub fn average(plots: Vec<OpinionPlot>) -> OpinionPlot {
+        let mut point_map: HashMap<u16, u64> = HashMap::new();
         let mut j = 0;
-        exports.iter().for_each(|export| {
-            export.plots.iter().for_each(|plot| {
-                plot.points.iter().for_each(|(x, y)| {
-                    point_map
-                        .entry(*x)
-                        .and_modify(|v| *v += y)
-                        .or_insert_with(|| *y);
-                });
-                j = plot.j;
+        plots.iter().for_each(|plot| {
+            plot.points.iter().for_each(|(x, y)| {
+                point_map
+                    .entry(*x)
+                    .and_modify(|v| *v += y)
+                    .or_insert_with(|| *y);
             });
+            j = plot.j;
         });
         let points = point_map
             .iter()
-            .map(|(x, y)| (x.clone(), y / exports.len() as u64))
+            .map(|(x, y)| (*x, y / plots.len() as u64))
             .collect::<Vec<_>>();
         point_map.clear();
         OpinionPlot { points, j }

@@ -5,11 +5,11 @@ use crate::error::AppError;
 
 #[derive(Clone, Debug)]
 pub struct Agent {
-    pub opinion: u8,
+    pub opinion: u16,
 }
 
 impl Agent {
-    pub fn new(opinion: u8) -> Self {
+    pub fn new(opinion: u16) -> Self {
         Agent { opinion }
     }
 
@@ -19,7 +19,7 @@ impl Agent {
         &mut self,
         agents: &Vec<Agent>,
         interaction_count: Option<&mut u64>,
-    ) -> Result<u8, AppError> {
+    ) -> Result<u16, AppError> {
         // If the sample is empty, do not update the
         // agent opinion and return early.
         if agents.is_empty() {
@@ -34,7 +34,7 @@ impl Agent {
             *counts.entry(agent.opinion).or_insert(0) += 1;
         });
         let max_count = counts.values().max().unwrap_or(&0);
-        let major_opinions: Vec<u8> = counts
+        let major_opinions: Vec<u16> = counts
             .iter()
             .filter(|&(_, &count)| count == *max_count)
             .map(|(&elem, _)| elem)
@@ -71,7 +71,7 @@ mod agent {
     #[case(10000, 200)]
     fn updates_to_major_opinion(
         #[case] sample_size: u64,
-        #[case] opinion_count: u8,
+        #[case] opinion_count: u16,
     ) -> Result<(), AppError> {
         let mut rng = rand::thread_rng();
         let mut agent = Agent::new(rng.gen());
@@ -105,7 +105,7 @@ mod agent {
     #[case(5)]
     #[case(10)]
     #[case(100)]
-    fn updates_to_major_opinion_on_a_tie(#[case] major_opinion_count: u8) -> Result<(), AppError> {
+    fn updates_to_major_opinion_on_a_tie(#[case] major_opinion_count: u16) -> Result<(), AppError> {
         let mut rng = rand::thread_rng();
         let mut agent = Agent::new(rng.gen());
 

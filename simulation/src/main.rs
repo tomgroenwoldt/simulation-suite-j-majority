@@ -3,7 +3,7 @@ extern crate human_format;
 use config::Config;
 use eframe::NativeOptions;
 use error::AppError;
-use export::SimulationExport;
+use export::{OpinionPlot, SimulationExport};
 use human_format::Formatter;
 use simulation::{FrontendSimulation, SimulationMessage};
 use std::{
@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::broadcast::{self, Sender};
+use umya_spreadsheet::{new_file, writer};
 
 mod agent;
 mod config;
@@ -29,6 +30,7 @@ pub struct App {
     paused: bool,
     formatter: Formatter,
     export: SimulationExport,
+    progress: f32,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -64,7 +66,45 @@ impl App {
             paused: false,
             formatter,
             export: SimulationExport::default(),
+            progress: 0.0,
         }
+    }
+
+    pub fn save(plots: &Vec<OpinionPlot>) -> Result<(), AppError> {
+        let mut book = new_file();
+        let _ = book.new_sheet("Sheet1");
+        let file_name = if let Some(first_plot) = plots.first() {
+            format!(
+                "{}-simulations-with-{}-j-{}-k.csv",
+                plots.len(),
+                first_plot.j,
+                first_plot.points.len() + 1
+            )
+        } else {
+            panic!("Not a single plot was found, this is impossible!");
+        };
+        let path = std::path::Path::new(&file_name);
+
+        // Write header.
+        if let Some(plot) = plots.first() {
+            for i in 0..plot.points.len() {
+                book.get_sheet_by_name_mut("Sheet1")
+                    .unwrap()
+                    .get_cell_mut(((i + 1) as u32, 1))
+                    .set_value((i + 2).to_string());
+            }
+        }
+
+        for (i, plot) in plots.iter().enumerate() {
+            for j in 0..plot.points.len() {
+                book.get_sheet_by_name_mut("Sheet1")
+                    .unwrap()
+                    .get_cell_mut(((j + 1) as u32, (i + 3) as u32))
+                    .set_value(&plot.points[j].1.to_string());
+            }
+        }
+        writer::csv::write(&book, path, None).map_err(|_| AppError::ExportError)?;
+        Ok(())
     }
 }
 

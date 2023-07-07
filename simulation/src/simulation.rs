@@ -8,15 +8,15 @@ use futures::executor::block_on;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use tokio::sync::broadcast::Receiver;
 
-use crate::{agent::Agent, error::AppError, export::SimulationExport, Config};
+use crate::{agent::Agent, error::AppError, export::OpinionPlot, Config};
 
 #[derive(Debug, Default, Clone)]
 pub struct OpinionDistribution {
-    pub map: HashMap<u8, u64>,
+    pub map: HashMap<u16, u64>,
 }
 
 impl OpinionDistribution {
-    pub fn update(&mut self, old_opinion: Option<u8>, new_opinion: u8) -> u64 {
+    pub fn update(&mut self, old_opinion: Option<u16>, new_opinion: u16) -> u64 {
         if let Some(old_opinion) = old_opinion {
             self.map.entry(old_opinion).and_modify(|v| *v -= 1);
         }
@@ -36,8 +36,8 @@ pub struct Simulation {
     /// The sample size for each agent.
     pub j: u8,
     /// The amount of different opinions.
-    pub k: u8,
-    pub upper_bound_k: u8,
+    pub k: u16,
+    pub upper_bound_k: u16,
     /// Counts the interactions of all agents.
     pub interaction_count: u64,
     /// Stores number of occurences for each opinion.
@@ -64,7 +64,7 @@ pub enum SimulationMessage {
     Pause,
     Play,
     Abort,
-    Update((Option<u8>, u8, u64)),
+    Update((Option<u16>, u16, u64)),
     Next,
     Finish,
 }
@@ -79,8 +79,9 @@ pub enum SimulationModel {
 pub struct FrontendSimulation {
     pub opinion_distribution: OpinionDistribution,
     pub interaction_count: u64,
+    pub current_opinion: u16,
     pub finished: bool,
-    pub export: SimulationExport,
+    pub plot: OpinionPlot,
 }
 
 impl Simulation {
@@ -93,7 +94,7 @@ impl Simulation {
         //     .expect("Error trying to create weighted index for simulation.");
 
         // We start with the case of k = 2.
-        let choices = (0..2).collect::<Vec<u8>>();
+        let choices = (0..2).collect::<Vec<u16>>();
 
         // Create agents with random opinions and generate the opinion
         // distribution.
@@ -115,7 +116,7 @@ impl Simulation {
             interaction_count: 0,
             sender,
             state: Arc::new((Mutex::new(SimulationState::Play), Condvar::new())),
-            model: config.model.clone(),
+            model: config.model,
             config: config_clone,
         }
     }
@@ -125,7 +126,7 @@ impl Simulation {
         agents: &mut Vec<Agent>,
         opinion_distribution: &mut OpinionDistribution,
         interaction_count: &mut u64,
-        k: &mut u8,
+        k: &mut u16,
         sender: &mut SyncSender<SimulationMessage>,
     ) {
         let mut rng = rand::thread_rng();
@@ -367,7 +368,7 @@ mod simulation {
     #[case(64)]
     #[case(128)]
     #[case(255)]
-    fn two_agents_only_need_one_interaction(#[case] opinion_count: u8) -> Result<(), AppError> {
+    fn two_agents_only_need_one_interaction(#[case] opinion_count: u16) -> Result<(), AppError> {
         let config = Config {
             agent_count: 2,
             sample_size: 2,
