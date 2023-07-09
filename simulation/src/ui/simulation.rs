@@ -1,5 +1,5 @@
 use egui::{
-    plot::{Bar, BarChart, Legend, Plot},
+    plot::{Bar, BarChart, Legend, Line, Plot},
     Context, ProgressBar,
 };
 use std::{
@@ -11,7 +11,7 @@ use tracing::error;
 use crate::{
     error::AppError,
     export::{OpinionPlot, SimulationExport},
-    simulation::{FrontendSimulation, OpinionDistribution, Simulation, SimulationMessage},
+    simulation::{Entropy, FrontendSimulation, OpinionDistribution, Simulation, SimulationMessage},
     App, State,
 };
 
@@ -46,9 +46,13 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                                             old,
                                             new,
                                             new_interaction_count,
+                                            entropy,
                                         )) => {
                                             simulation.opinion_distribution.update(old, new);
                                             simulation.interaction_count = new_interaction_count;
+                                            if let Some(entropy) = entropy {
+                                                simulation.entropy = entropy;
+                                            }
                                         }
                                         SimulationMessage::Next => {
                                             let opinion_count =
@@ -122,17 +126,28 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                         app.state = State::Config;
                     }
                     if ui.button("Export").clicked() {
-                        let mut exports = vec![];
+                        let mut plots = vec![];
+                        let mut entropies = vec![];
                         for simulation in app.simulations.iter() {
                             let mut simulation = simulation.lock().unwrap();
                             let sample_size = app.config.sample_size;
                             simulation.plot.j = sample_size;
-                            exports.push(simulation.plot.clone());
+                            plots.push(simulation.plot.clone());
+                            entropies.push(simulation.entropy.clone());
                         }
                         // Save all single plots before averaging them.
-                        App::save(&exports)?;
+                        App::save(&plots)?;
                         // Calculate average of all plots and conclude into one.
-                        app.export.plots.push(SimulationExport::average(exports));
+                        let (average_plot, average_entropy) =
+                            SimulationExport::average(plots, entropies);
+                        app.export.plots = app
+                            .export
+                            .plots
+                            .iter()
+                            .cloned()
+                            .filter(|plot| plot.j != average_plot.j)
+                            .collect::<Vec<_>>();
+                        app.export.plots.push(average_plot);
                         app.export.generate_pdf();
                     }
                     ui.add(ProgressBar::new(app.progress).show_percentage());
@@ -145,59 +160,74 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
 }
 
 pub fn render_simulation_charts(ctx: &Context, app: &mut App) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        let mut charts = vec![];
-        let mut interaction_counts = vec![];
-        let mut current_opinions = vec![];
-        for (index, simulation) in app.simulations.iter().enumerate() {
-            let simulation = simulation.lock().unwrap();
-            let chart = BarChart::new(
-                simulation
-                    .opinion_distribution
-                    .map
+    egui::TopBottomPanel::top("entropy")
+        .resizable(true)
+        .show(ctx, |ui| {
+            let mut entropy: Entropy = Entropy::default();
+            for (_index, simulation) in app.simulations.iter().enumerate() {
+                entropy = simulation.lock().unwrap().entropy.clone();
+            }
+            Plot::new("chart")
+                .legend(Legend::default())
+                .show(ui, |plot_ui| plot_ui.line(Line::new(entropy).width(2.0)));
+        });
+    egui::TopBottomPanel::bottom("opinion_distribution")
+        .resizable(true)
+        .show(ctx, |ui| {
+            let mut charts = vec![];
+            let mut interaction_counts = vec![];
+            let mut current_opinions = vec![];
+            for (index, simulation) in app.simulations.iter().enumerate() {
+                let simulation = simulation.lock().unwrap();
+                let chart = BarChart::new(
+                    simulation
+                        .opinion_distribution
+                        .map
+                        .iter()
+                        .map(|(x, y)| {
+                            Bar::new(
+                                *x as f64 + ((app.config.opinion_count * 2) as f64 * index as f64),
+                                *y as f64,
+                            )
+                            .width(0.8_f64)
+                        })
+                        .collect(),
+                )
+                .name(app.formatter.format(simulation.interaction_count as f64));
+
+                charts.push(chart);
+                interaction_counts.push(simulation.interaction_count);
+                current_opinions.push(simulation.current_opinion + 1);
+            }
+
+            let average_interaction_count = if let Some(average_interaction_count) =
+                interaction_counts
                     .iter()
-                    .map(|(x, y)| {
-                        Bar::new(
-                            *x as f64 + ((app.config.opinion_count * 2) as f64 * index as f64),
-                            *y as f64,
-                        )
-                        .width(0.8_f64)
-                    })
-                    .collect(),
-            )
-            .name(app.formatter.format(simulation.interaction_count as f64));
+                    .sum::<u64>()
+                    .checked_div(interaction_counts.len() as u64)
+            {
+                average_interaction_count
+            } else {
+                0
+            };
+            let progress = current_opinions
+                .iter()
+                .sum::<u16>()
+                .checked_div(current_opinions.len() as u16);
+            if let Some(progress) = progress {
+                app.progress = progress as f32 / app.config.opinion_count as f32;
+            }
+            // Format the number into a human readable string.
+            let human_number = app.formatter.format(average_interaction_count as f64);
 
-            charts.push(chart);
-            interaction_counts.push(simulation.interaction_count);
-            current_opinions.push(simulation.current_opinion + 1);
-        }
-
-        let average_interaction_count = if let Some(average_interaction_count) = interaction_counts
-            .iter()
-            .sum::<u64>()
-            .checked_div(interaction_counts.len() as u64)
-        {
-            average_interaction_count
-        } else {
-            0
-        };
-        let progress = current_opinions
-            .iter()
-            .sum::<u16>()
-            .checked_div(current_opinions.len() as u16);
-        if let Some(progress) = progress {
-            app.progress = progress as f32 / app.config.opinion_count as f32;
-        }
-        // Format the number into a human readable string.
-        let human_number = app.formatter.format(average_interaction_count as f64);
-
-        Plot::new("chart")
-            .legend(Legend::default())
-            .show(ui, |plot_ui| {
-                for chart in charts {
-                    plot_ui
-                        .bar_chart(chart.name(format!("Average interactions: {}", human_number)));
-                }
-            });
-    });
+            Plot::new("chart")
+                .legend(Legend::default())
+                .show(ui, |plot_ui| {
+                    for chart in charts {
+                        plot_ui.bar_chart(
+                            chart.name(format!("Average interactions: {}", human_number)),
+                        );
+                    }
+                });
+        });
 }

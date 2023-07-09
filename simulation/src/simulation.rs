@@ -4,6 +4,7 @@ use std::{
     thread,
 };
 
+use egui::plot::{PlotPoint, PlotPoints};
 use futures::executor::block_on;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use tokio::sync::broadcast::Receiver;
@@ -27,6 +28,38 @@ impl OpinionDistribution {
             .or_insert_with(|| 1);
         updated_count
     }
+    fn calculate_entropy(&self, n: f32) -> f32 {
+        let opinion_percentages = self
+            .map
+            .iter()
+            .map(|(_, agents_with_opinion)| *agents_with_opinion as f32 / n)
+            .collect::<Vec<f32>>();
+        let mut entropy = 0.0;
+        for percentage in opinion_percentages.into_iter() {
+            entropy -= percentage * f32::log2(percentage);
+        }
+        entropy
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Entropy {
+    pub map: HashMap<u64, f32>,
+}
+
+impl Into<PlotPoints> for Entropy {
+    fn into(self) -> PlotPoints {
+        let entropy_plot: Vec<PlotPoint> = (0..self.map.len())
+            .map(|i| {
+                if let Some(value) = self.map.get(&(i as u64)) {
+                    PlotPoint::new(i as f32, *value)
+                } else {
+                    PlotPoint::new(0.0, 0.0)
+                }
+            })
+            .collect();
+        PlotPoints::Owned(entropy_plot)
+    }
 }
 
 #[derive(Debug)]
@@ -42,6 +75,7 @@ pub struct Simulation {
     pub interaction_count: u64,
     /// Stores number of occurences for each opinion.
     pub opinion_distribution: OpinionDistribution,
+    pub entropy: Entropy,
     pub sender: SyncSender<SimulationMessage>,
     /// State and condition variable, which can block the executor thread
     /// of the simulation.
@@ -64,7 +98,7 @@ pub enum SimulationMessage {
     Pause,
     Play,
     Abort,
-    Update((Option<u16>, u16, u64)),
+    Update((Option<u16>, u16, u64, Option<Entropy>)),
     Next,
     Finish,
 }
@@ -78,6 +112,7 @@ pub enum SimulationModel {
 #[derive(Debug, Default)]
 pub struct FrontendSimulation {
     pub opinion_distribution: OpinionDistribution,
+    pub entropy: Entropy,
     pub interaction_count: u64,
     pub current_opinion: u16,
     pub finished: bool,
@@ -98,12 +133,13 @@ impl Simulation {
 
         // Create agents with random opinions and generate the opinion
         // distribution.
+        let n = config.agent_count as f32;
         for _ in 0..config.agent_count {
             let new_opinion = choices.choose(&mut rng).unwrap();
 
             opinion_distribution.update(None, *new_opinion);
             sender
-                .send(SimulationMessage::Update((None, *new_opinion, 0)))
+                .send(SimulationMessage::Update((None, *new_opinion, 0, None)))
                 .expect("Error sending initial simulation updates to egui!");
             agents.push(Agent::new(*new_opinion));
         }
@@ -113,6 +149,7 @@ impl Simulation {
             k: 2,
             upper_bound_k: config.opinion_count + 1,
             opinion_distribution,
+            entropy: Entropy::default(),
             interaction_count: 0,
             sender,
             state: Arc::new((Mutex::new(SimulationState::Play), Condvar::new())),
@@ -125,6 +162,7 @@ impl Simulation {
         config: Config,
         agents: &mut Vec<Agent>,
         opinion_distribution: &mut OpinionDistribution,
+        entropy: &mut Entropy,
         interaction_count: &mut u64,
         k: &mut u16,
         sender: &mut SyncSender<SimulationMessage>,
@@ -132,6 +170,7 @@ impl Simulation {
         let mut rng = rand::thread_rng();
         *agents = vec![];
         *opinion_distribution = OpinionDistribution::default();
+        *entropy = Entropy::default();
         *interaction_count = 0;
         *k += 1;
         // let weighted_index = WeightedIndex::new(config.weights.into_values().collect::<Vec<_>>())
@@ -140,12 +179,13 @@ impl Simulation {
 
         // Create agents with random opinions and generate the opinion
         // distribution.
+        let n = config.agent_count as f32;
         for _ in 0..config.agent_count {
             let new_opinion = choices.choose(&mut rng).unwrap();
 
             opinion_distribution.update(None, *new_opinion);
             sender
-                .send(SimulationMessage::Update((None, *new_opinion, 0)))
+                .send(SimulationMessage::Update((None, *new_opinion, 0, None)))
                 .expect("Error sending initial simulation updates to egui!");
             agents.push(Agent::new(*new_opinion));
         }
@@ -206,10 +246,16 @@ impl Simulation {
                 let updated_opinion_count = self
                     .opinion_distribution
                     .update(Some(old_opinion), new_opinion);
+
+                let entropy = self
+                    .opinion_distribution
+                    .calculate_entropy(agent_count as f32);
+                self.entropy.map.insert(self.interaction_count, entropy);
                 self.sender.send(SimulationMessage::Update((
                     Some(old_opinion),
                     new_opinion,
                     self.interaction_count,
+                    Some(self.entropy.clone()),
                 )))?;
 
                 if updated_opinion_count.eq(&agent_count) {
@@ -225,6 +271,7 @@ impl Simulation {
                             config,
                             &mut self.agents,
                             &mut self.opinion_distribution,
+                            &mut self.entropy,
                             &mut self.interaction_count,
                             &mut self.k,
                             &mut self.sender,
@@ -257,6 +304,7 @@ impl Simulation {
                         Some(old_opinion),
                         new_opinion,
                         self.interaction_count,
+                        Some(self.entropy.clone()),
                     )))?;
 
                     // Exit simulation if all agents agree on one opinion.

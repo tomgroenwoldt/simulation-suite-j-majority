@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::simulation::Entropy;
 use pgfplots::{
     axis::{
         plot::{MarkShape, Marker, Plot2D, PlotKey},
@@ -7,11 +8,11 @@ use pgfplots::{
     },
     Engine, Picture,
 };
-use tracing::info;
 
 #[derive(Default, Debug, Clone)]
 pub struct SimulationExport {
     pub plots: Vec<OpinionPlot>,
+    pub entropy: Entropy,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -99,11 +100,10 @@ impl SimulationExport {
         axis.add_key(AxisKey::Custom(String::from("xmode=log")));
         axis.add_key(AxisKey::Custom(String::from("log ticks with fixed point")));
         axis.plots = plots;
-        info!("{}", axis.to_string());
         Picture::from(axis).show_pdf(Engine::PdfLatex).unwrap();
     }
 
-    pub fn average(plots: Vec<OpinionPlot>) -> OpinionPlot {
+    pub fn average(plots: Vec<OpinionPlot>, entropies: Vec<Entropy>) -> (OpinionPlot, Entropy) {
         let mut point_map: HashMap<u16, u64> = HashMap::new();
         let mut j = 0;
         plots.iter().for_each(|plot| {
@@ -120,6 +120,8 @@ impl SimulationExport {
             .map(|(x, y)| (*x, y / plots.len() as u64))
             .collect::<Vec<_>>();
         point_map.clear();
-        OpinionPlot { points, j }
+
+        // TODO: Calculate average of entropies
+        (OpinionPlot { points, j }, entropies[0].clone())
     }
 }
