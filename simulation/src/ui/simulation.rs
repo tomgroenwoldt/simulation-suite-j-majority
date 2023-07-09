@@ -1,5 +1,5 @@
 use egui::{
-    plot::{Bar, BarChart, Legend, Line, Plot},
+    plot::{Bar, BarChart, Legend, Plot},
     Context, ProgressBar,
 };
 use std::{
@@ -10,8 +10,11 @@ use tracing::error;
 
 use crate::{
     error::AppError,
-    export::{OpinionPlot, SimulationExport},
-    simulation::{Entropy, FrontendSimulation, OpinionDistribution, Simulation, SimulationMessage},
+    export::SimulationExport,
+    schema::{
+        opinion_distribution::OpinionDistribution,
+        simulation::{FrontendSimulation, Simulation, SimulationMessage},
+    },
     App, State,
 };
 
@@ -36,41 +39,24 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                         senders.push(sender);
 
                         // Message handler which communicates with the simulation thread.
-                        thread::spawn(move || {
-                            let mut plot = OpinionPlot::default();
-                            loop {
-                                if let Ok(msg) = receiver.recv() {
-                                    let mut simulation = frontend_simulation_clone.lock().unwrap();
-                                    match msg {
-                                        SimulationMessage::Update((
-                                            old,
-                                            new,
-                                            new_interaction_count,
-                                            entropy,
-                                        )) => {
-                                            simulation.opinion_distribution.update(old, new);
-                                            simulation.interaction_count = new_interaction_count;
-                                            if let Some(entropy) = entropy {
-                                                simulation.entropy = entropy;
-                                            }
-                                        }
-                                        SimulationMessage::Next => {
-                                            let opinion_count =
-                                                simulation.opinion_distribution.map.len() as u16;
-                                            let interaction_count = simulation.interaction_count;
-                                            plot.points.push((opinion_count, interaction_count));
-                                            simulation.opinion_distribution =
-                                                OpinionDistribution::default();
-                                            simulation.interaction_count = 0;
-                                            simulation.current_opinion += 1;
-                                        }
-                                        SimulationMessage::Finish => {
-                                            simulation.plot = plot;
-                                            simulation.finished = true;
-                                            return;
-                                        }
-                                        _ => {}
+                        thread::spawn(move || loop {
+                            if let Ok(msg) = receiver.recv() {
+                                let mut simulation = frontend_simulation_clone.lock().unwrap();
+                                match msg {
+                                    SimulationMessage::Update(opinion_distribution) => {
+                                        simulation.opinion_distribution = opinion_distribution;
                                     }
+                                    SimulationMessage::Next => {
+                                        simulation.opinion_distribution =
+                                            OpinionDistribution::default();
+                                        simulation.current_opinion += 1;
+                                    }
+                                    SimulationMessage::Finish(plot) => {
+                                        simulation.plot = plot;
+                                        simulation.finished = true;
+                                        return;
+                                    }
+                                    _ => {}
                                 }
                             }
                         });
@@ -85,16 +71,14 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                         let receiver = app.broadcast.subscribe();
 
                         thread::spawn(move || {
-                            let mut simulation = Simulation::new(config, sender);
-                            match simulation.execute(receiver) {
-                                Ok(_) => {}
-                                Err(e) => error!("Error while executing simulation: {e}"),
+                            if let Ok(mut simulation) = Simulation::new(config, sender) {
+                                match simulation.execute(receiver) {
+                                    Ok(_) => {}
+                                    Err(e) => error!("Error while executing simulation: {e}"),
+                                }
                             }
                         });
                     }
-                }
-                if ui.button("Clear export").clicked() {
-                    app.export = SimulationExport::default();
                 }
             });
 
@@ -121,25 +105,19 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
                 });
                 ui.add_enabled_ui(finished, |ui| {
                     if ui.button("Run new simulation").clicked() {
-                        app.broadcast.send(SimulationMessage::Finish)?;
                         app.simulations.clear();
                         app.state = State::Config;
                     }
                     if ui.button("Export").clicked() {
                         let mut plots = vec![];
-                        let mut entropies = vec![];
                         for simulation in app.simulations.iter() {
-                            let mut simulation = simulation.lock().unwrap();
-                            let sample_size = app.config.sample_size;
-                            simulation.plot.j = sample_size;
+                            let simulation = simulation.lock().unwrap();
                             plots.push(simulation.plot.clone());
-                            entropies.push(simulation.entropy.clone());
                         }
                         // Save all single plots before averaging them.
                         App::save(&plots)?;
                         // Calculate average of all plots and conclude into one.
-                        let (average_plot, average_entropy) =
-                            SimulationExport::average(plots, entropies);
+                        let average_plot = SimulationExport::average(plots);
                         app.export.plots = app
                             .export
                             .plots
@@ -160,74 +138,58 @@ pub fn render_simulation_header(ctx: &Context, app: &mut App) -> Result<(), AppE
 }
 
 pub fn render_simulation_charts(ctx: &Context, app: &mut App) {
-    egui::TopBottomPanel::top("entropy")
-        .resizable(true)
-        .show(ctx, |ui| {
-            let mut entropy: Entropy = Entropy::default();
-            for (_index, simulation) in app.simulations.iter().enumerate() {
-                entropy = simulation.lock().unwrap().entropy.clone();
-            }
-            Plot::new("chart")
-                .legend(Legend::default())
-                .show(ui, |plot_ui| plot_ui.line(Line::new(entropy).width(2.0)));
-        });
-    egui::TopBottomPanel::bottom("opinion_distribution")
-        .resizable(true)
-        .show(ctx, |ui| {
-            let mut charts = vec![];
-            let mut interaction_counts = vec![];
-            let mut current_opinions = vec![];
-            for (index, simulation) in app.simulations.iter().enumerate() {
-                let simulation = simulation.lock().unwrap();
-                let chart = BarChart::new(
-                    simulation
-                        .opinion_distribution
-                        .map
-                        .iter()
-                        .map(|(x, y)| {
-                            Bar::new(
-                                *x as f64 + ((app.config.opinion_count * 2) as f64 * index as f64),
-                                *y as f64,
-                            )
-                            .width(0.8_f64)
-                        })
-                        .collect(),
-                )
-                .name(app.formatter.format(simulation.interaction_count as f64));
-
-                charts.push(chart);
-                interaction_counts.push(simulation.interaction_count);
-                current_opinions.push(simulation.current_opinion + 1);
-            }
-
-            let average_interaction_count = if let Some(average_interaction_count) =
-                interaction_counts
+    egui::CentralPanel::default().show(ctx, |ui| {
+        let mut charts = vec![];
+        let mut interaction_counts = vec![];
+        let mut current_opinions = vec![];
+        for (index, simulation) in app.simulations.iter().enumerate() {
+            let simulation = simulation.lock().unwrap();
+            let chart = BarChart::new(
+                simulation
+                    .opinion_distribution
+                    .map
                     .iter()
-                    .sum::<u64>()
-                    .checked_div(interaction_counts.len() as u64)
-            {
-                average_interaction_count
-            } else {
-                0
-            };
-            let progress = current_opinions
-                .iter()
-                .sum::<u16>()
-                .checked_div(current_opinions.len() as u16);
-            if let Some(progress) = progress {
-                app.progress = progress as f32 / app.config.opinion_count as f32;
-            }
-            // Format the number into a human readable string.
-            let human_number = app.formatter.format(average_interaction_count as f64);
+                    .map(|(x, y)| {
+                        Bar::new(
+                            *x as f64 + ((app.config.upper_bound_k * 2) as f64 * index as f64),
+                            *y as f64,
+                        )
+                        .width(0.8_f64)
+                    })
+                    .collect(),
+            );
 
-            Plot::new("chart")
-                .legend(Legend::default())
-                .show(ui, |plot_ui| {
-                    for chart in charts {
-                        plot_ui.bar_chart(
-                            chart.name(format!("Average interactions: {}", human_number)),
-                        );
-                    }
-                });
-        });
+            charts.push(chart);
+            interaction_counts.push(simulation.opinion_distribution.interaction_count);
+            current_opinions.push(simulation.current_opinion + 1);
+        }
+
+        let average_interaction_count = if let Some(average_interaction_count) = interaction_counts
+            .iter()
+            .sum::<u64>()
+            .checked_div(interaction_counts.len() as u64)
+        {
+            average_interaction_count
+        } else {
+            0
+        };
+        let progress = current_opinions
+            .iter()
+            .sum::<u16>()
+            .checked_div(current_opinions.len() as u16);
+        if let Some(progress) = progress {
+            app.progress = progress as f32 / app.config.upper_bound_k as f32;
+        }
+        // Format the number into a human readable string.
+        let human_number = app.formatter.format(average_interaction_count as f64);
+
+        Plot::new("chart")
+            .legend(Legend::default())
+            .show(ui, |plot_ui| {
+                for chart in charts {
+                    plot_ui
+                        .bar_chart(chart.name(format!("Average interactions: {}", human_number)));
+                }
+            });
+    });
 }

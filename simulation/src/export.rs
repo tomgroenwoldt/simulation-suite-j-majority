@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::simulation::Entropy;
 use pgfplots::{
     axis::{
         plot::{MarkShape, Marker, Plot2D, PlotKey},
@@ -12,7 +11,6 @@ use pgfplots::{
 #[derive(Default, Debug, Clone)]
 pub struct SimulationExport {
     pub plots: Vec<OpinionPlot>,
-    pub entropy: Entropy,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -103,7 +101,7 @@ impl SimulationExport {
         Picture::from(axis).show_pdf(Engine::PdfLatex).unwrap();
     }
 
-    pub fn average(plots: Vec<OpinionPlot>, entropies: Vec<Entropy>) -> (OpinionPlot, Entropy) {
+    pub fn average(plots: Vec<OpinionPlot>) -> OpinionPlot {
         let mut point_map: HashMap<u16, u64> = HashMap::new();
         let mut j = 0;
         plots.iter().for_each(|plot| {
@@ -121,7 +119,6 @@ impl SimulationExport {
             .collect::<Vec<_>>();
         point_map.clear();
 
-        // TODO: Calculate average of entropies
-        (OpinionPlot { points, j }, entropies[0].clone())
+        OpinionPlot { points, j }
     }
 }

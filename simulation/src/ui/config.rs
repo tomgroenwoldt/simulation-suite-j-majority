@@ -1,6 +1,6 @@
 use egui::{global_dark_light_mode_buttons, Layout, Ui};
 
-use crate::{simulation::SimulationModel, App, State};
+use crate::{App, State};
 
 pub fn render_config(ui: &mut Ui, app: &mut App) {
     ui.heading("Configuration");
@@ -20,7 +20,7 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
                     .trailing_fill(true),
             );
             ui.add(
-                egui::Slider::new(&mut app.config.opinion_count, 2..=65535)
+                egui::Slider::new(&mut app.config.upper_bound_k, 2..=65535)
                     .text("Number of Opinions")
                     .logarithmic(true)
                     .trailing_fill(true),
@@ -30,41 +30,9 @@ pub fn render_config(ui: &mut Ui, app: &mut App) {
                     .text("Number of Simulations")
                     .trailing_fill(true),
             );
-            ui.with_layout(Layout::left_to_right(egui::Align::Min), |ui| {
-                ui.selectable_value(
-                    &mut app.config.model,
-                    SimulationModel::Population,
-                    "Population model",
-                );
-                ui.selectable_value(
-                    &mut app.config.model,
-                    SimulationModel::Gossip,
-                    "Gossip model",
-                );
-            });
         });
         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
             global_dark_light_mode_buttons(ui);
         });
-    });
-}
-
-pub fn _render_opinion_distribution_config(ui: &mut Ui, app: &mut App) {
-    // ui.set_enabled(app.state.eq(&State::Config));
-    ui.set_enabled(false);
-    ui.heading("Opinion distribution");
-    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |_ui| {
-        for _opinion in 0..app.config.opinion_count {
-            // ui.add(
-            //     egui::Slider::new(app.config.weights.entry(opinion).or_insert(1), 0..=50)
-            //         .vertical()
-            //         .trailing_fill(true),
-            // );
-        }
-        // Remove old opinion distribution entries. Otherwise a decrease in opinion
-        // count via the GUI would result in a program crash.
-        for _old in app.config.opinion_count..10 {
-            // app.config.weights.remove_entry(&old);
-        }
     });
 }

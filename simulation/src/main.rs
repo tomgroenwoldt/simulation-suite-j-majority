@@ -1,23 +1,26 @@
-extern crate human_format;
-
-use config::Config;
-use eframe::NativeOptions;
-use error::AppError;
-use export::{OpinionPlot, SimulationExport};
-use human_format::Formatter;
-use simulation::{FrontendSimulation, SimulationMessage};
 use std::{
     sync::{mpsc::SyncSender, Arc, Mutex},
     thread,
     time::Duration,
 };
+
+use eframe::NativeOptions;
+use error::AppError;
+use export::{OpinionPlot, SimulationExport};
+use human_format::Formatter;
+use schema::{
+    config::Config,
+    simulation::{FrontendSimulation, SimulationMessage},
+};
 use tokio::sync::broadcast::{self, Sender};
 use umya_spreadsheet::{new_file, writer};
 
 mod agent;
-mod config;
+mod entropy;
 mod error;
 mod export;
+mod opinion_distribution;
+mod schema;
 mod simulation;
 mod ui;
 
