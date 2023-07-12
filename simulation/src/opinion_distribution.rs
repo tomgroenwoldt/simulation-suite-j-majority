@@ -1,6 +1,34 @@
+use std::collections::HashMap;
+
 use crate::schema::opinion_distribution::OpinionDistribution;
 
+impl Default for OpinionDistribution {
+    fn default() -> Self {
+        Self {
+            map: HashMap::default(),
+            interaction_count: 0,
+            progress: 0.0,
+            opinion: 2,
+        }
+    }
+}
+
+impl From<&OpinionDistribution> for (u16, u64) {
+    fn from(value: &OpinionDistribution) -> Self {
+        (value.opinion, value.interaction_count)
+    }
+}
+
 impl OpinionDistribution {
+    pub fn next(previous_opinion: u16) -> Self {
+        Self {
+            map: HashMap::default(),
+            interaction_count: 0,
+            progress: 0.0,
+            opinion: previous_opinion + 1,
+        }
+    }
+
     pub fn update(&mut self, old_opinion: Option<u16>, new_opinion: u16) -> u64 {
         if let Some(old_opinion) = old_opinion {
             self.map.entry(old_opinion).and_modify(|v| *v -= 1);
@@ -14,15 +42,17 @@ impl OpinionDistribution {
         updated_count
     }
 
-    pub fn calculate_entropy(&self, n: f32) -> f32 {
+    pub fn calculate_entropy(&self, n: u64) -> f32 {
         let opinion_percentages = self
             .map
             .values()
-            .map(|agents_with_opinion| *agents_with_opinion as f32 / n)
+            .map(|agents_with_opinion| *agents_with_opinion as f32 / n as f32)
             .collect::<Vec<f32>>();
         let mut entropy = 0.0;
         for percentage in opinion_percentages.into_iter() {
-            entropy -= percentage * f32::log2(percentage);
+            if percentage != 0.0 {
+                entropy -= percentage * percentage.log(self.opinion as f32);
+            }
         }
         entropy
     }

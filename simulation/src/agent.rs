@@ -16,7 +16,6 @@ impl Agent {
     pub fn update(
         &mut self,
         sample: &[Agent],
-        interaction_count: Option<&mut u64>,
         opinion_distribution: &mut OpinionDistribution,
     ) -> Result<(), AppError> {
         // Counts the occurence of each opinion and find the major opinion.
@@ -36,9 +35,7 @@ impl Agent {
             opinion_distribution.update(Some(self.opinion), *major_opinion);
             self.opinion = *major_opinion;
         }
-        if let Some(interaction_count) = interaction_count {
-            *interaction_count += 1;
-        }
+        opinion_distribution.interaction_count += 1;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use self::{
     config::render_config,
-    simulation::{render_simulation_charts, render_simulation_header},
+    simulation::{render_simulation_data, render_simulation_header},
 };
 use crate::{error::AppError, App};
 
@@ -16,7 +16,7 @@ impl eframe::App for App {
             });
             egui::CentralPanel::default().show(ctx, |_ui| {
                 render_simulation_header(ctx, self)?;
-                render_simulation_charts(ctx, self);
+                render_simulation_data(ctx, self);
                 Ok::<(), AppError>(())
             });
         });

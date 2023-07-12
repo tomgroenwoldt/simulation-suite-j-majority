@@ -1,23 +1,35 @@
 use std::collections::HashMap;
 
-use egui::plot::{PlotPoint, PlotPoints};
+use egui::plot::{PlotPoint, PlotPoints, Points};
 
 #[derive(Debug, Default, Clone)]
 pub struct Entropy {
     pub map: HashMap<u64, f32>,
+    pub sample_size: u8,
 }
 
-impl From<Entropy> for PlotPoints {
-    fn from(val: Entropy) -> PlotPoints {
-        let entropy_plot: Vec<PlotPoint> = (0..val.map.len())
-            .map(|i| {
-                if let Some(value) = val.map.get(&(i as u64)) {
-                    PlotPoint::new(i as f32, *value)
-                } else {
-                    PlotPoint::new(0.0, 0.0)
-                }
+impl Entropy {
+    pub fn new(sample_size: u8) -> Self {
+        Self {
+            map: HashMap::default(),
+            sample_size,
+        }
+    }
+
+    pub fn average(&mut self, opinion_count: f32) {
+        self.map.values_mut().for_each(|v| *v /= opinion_count);
+    }
+}
+
+impl From<Entropy> for Points {
+    fn from(val: Entropy) -> Points {
+        let entropy_plot: Vec<PlotPoint> = val
+            .map
+            .into_iter()
+            .map(|(interaction_count, entropy_value)| {
+                PlotPoint::new(interaction_count as f32, entropy_value)
             })
             .collect();
-        PlotPoints::Owned(entropy_plot)
+        Points::new(PlotPoints::Owned(entropy_plot))
     }
 }

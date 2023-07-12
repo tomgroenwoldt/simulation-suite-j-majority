@@ -5,9 +5,9 @@ use std::{
 };
 
 use eframe::NativeOptions;
+use entropy::Entropy;
 use error::AppError;
 use export::{OpinionPlot, SimulationExport};
-use human_format::Formatter;
 use schema::{
     config::Config,
     simulation::{FrontendSimulation, SimulationMessage},
@@ -31,7 +31,7 @@ pub struct App {
     senders: Vec<SyncSender<SimulationMessage>>,
     broadcast: Sender<SimulationMessage>,
     paused: bool,
-    formatter: Formatter,
+    entropies: Vec<Entropy>,
     export: SimulationExport,
     progress: f32,
 }
@@ -58,7 +58,6 @@ impl App {
         });
 
         let (broadcast, _) = broadcast::channel(1000);
-        let formatter = Formatter::new();
 
         Self {
             state: State::Config,
@@ -67,13 +66,13 @@ impl App {
             senders: vec![],
             broadcast,
             paused: false,
-            formatter,
+            entropies: vec![],
             export: SimulationExport::default(),
             progress: 0.0,
         }
     }
 
-    pub fn save(plots: &Vec<OpinionPlot>) -> Result<(), AppError> {
+    pub fn save(plots: &Vec<OpinionPlot>, entropies: &[Entropy]) -> Result<(), AppError> {
         let mut book = new_file();
         let _ = book.new_sheet("Sheet1");
         let file_name = if let Some(first_plot) = plots.first() {
@@ -88,24 +87,52 @@ impl App {
         };
         let path = std::path::Path::new(&file_name);
 
-        // Write header.
+        let mut current_row = 1;
+        // Write plot header.
         if let Some(plot) = plots.first() {
             for i in 0..plot.points.len() {
                 book.get_sheet_by_name_mut("Sheet1")
                     .unwrap()
-                    .get_cell_mut(((i + 1) as u32, 1))
+                    .get_cell_mut(((i + 1) as u32, current_row))
                     .set_value((i + 2).to_string());
             }
+            current_row += 2;
         }
-
-        for (i, plot) in plots.iter().enumerate() {
+        for plot in plots.iter() {
             for j in 0..plot.points.len() {
                 book.get_sheet_by_name_mut("Sheet1")
                     .unwrap()
-                    .get_cell_mut(((j + 1) as u32, (i + 3) as u32))
+                    .get_cell_mut(((j + 1) as u32, current_row))
                     .set_value(&plot.points[j].1.to_string());
             }
+            current_row += 1;
         }
+
+        current_row += 2;
+        // Write entropy header.
+        if let Some(entropy) = entropies.first() {
+            let mut keys = entropy.map.keys().collect::<Vec<_>>();
+            keys.sort();
+            for (i, key) in keys.iter().enumerate() {
+                book.get_sheet_by_name_mut("Sheet1")
+                    .unwrap()
+                    .get_cell_mut(((i + 1) as u32, current_row))
+                    .set_value(key.to_string());
+            }
+            current_row += 2;
+        }
+        for entropy in entropies.iter() {
+            let mut points = entropy.map.iter().collect::<Vec<_>>();
+            points.sort_by(|point_one, point_two| point_one.0.cmp(point_two.0));
+            for (j, point) in points.iter().enumerate() {
+                book.get_sheet_by_name_mut("Sheet1")
+                    .unwrap()
+                    .get_cell_mut(((j + 1) as u32, current_row))
+                    .set_value(point.1.to_string());
+            }
+            current_row += 1;
+        }
+
         writer::csv::write(&book, path, None).map_err(|_| AppError::ExportError)?;
         Ok(())
     }

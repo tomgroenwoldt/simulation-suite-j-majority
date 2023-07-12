@@ -9,8 +9,7 @@ authors = ["Tom Groenwoldt <tom.groenwoldt@tuhh.de>"]
 eframe = "0.21.3"
 egui = "0.21.0"
 futures = "0.3.28"
-human_format = "1.0.3"
-pgfplots = { git = "https://github.com/tomgroenwoldt/pgfplots", branch = "add-marker-plot-key" }
+pgfplots = { git = "https://github.com/tomgroenwoldt/pgfplots", branch = "add-plus-to-add-plot-statement" }
 rand = "0.8.5"
 thiserror = "1.0.40"
 tokio = { version = "1.28.0", features = ["sync"] }
