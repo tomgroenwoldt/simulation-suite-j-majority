@@ -1,0 +1,16 @@
+[package]
+name = "export"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.72"
+clap = { version = "4.3.12", features = ["derive"] }
+clap-verbosity-flag = "2.0.1"
+env_logger = "0.10.0"
+log = "0.4.19"
+pgfplots = { git = "https://github.com/tomgroenwoldt/pgfplots", branch = "add-plus-to-add-plot-statement" }
+serde_json = "1.0.103"
+simulation = { path = "../simulation" }
