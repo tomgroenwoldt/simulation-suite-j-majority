@@ -1,0 +1,19 @@
+build:
+	cargo build
+build-release:
+	cargo build --release
+triangle: build-release
+  #!/usr/bin/env bash
+  n=100000
+    for ((i = 0; i <= n; i+=1000)); do
+      for ((j = 0; j <= n- i; j+=1000)); do
+        if [[ $((i + j)) -le $n ]]; then
+          k=$((n - i - j))
+          echo "($i, $j, $k)"
+          ./target/release/simulation_runner -n 100000 -j 3 -k 3 --config $i,$j,$k --output triangle
+        fi
+      done
+  done
+
+render-triangle:
+	cargo run --release --bin export -- -i output/triangle/simulation.json triangle

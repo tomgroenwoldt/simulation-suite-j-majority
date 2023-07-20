@@ -1,13 +1,16 @@
-use anyhow::Result;
-use plot::OpinionPlotWithIncreasingSampleSize;
-use simulation::Simulation;
 use std::fs::read_to_string;
 
-use args::Args;
+use anyhow::Result;
 use clap::Parser;
+
+use args::Args;
+use pgfplots::Engine;
+use plot::{PictureGeneration, Plot};
+use simulation::Simulation;
 
 mod args;
 mod plot;
+mod util;
 
 fn main() -> Result<()> {
     // Parse CLI arguments and initialize logger
@@ -16,10 +19,18 @@ fn main() -> Result<()> {
         .filter_level(args.verbose.log_level_filter())
         .init();
 
-    let simulations: Vec<Simulation> = serde_json::from_str(&read_to_string(&args.input)?)?;
+    // Extract simulations from input file
+    let input_file_content = &read_to_string(&args.input)?;
+    let simulations: Vec<Simulation> = serde_json::from_str(input_file_content)?;
 
-    let opinion_plot = OpinionPlotWithIncreasingSampleSize { simulations };
-    opinion_plot.generate_pdf();
+    // Generate pgfplot
+    let plot = Plot {
+        plot_type: args.plot_type,
+        simulations,
+    };
+    let picture = plot.generate_picture();
+    println!("{}", picture.standalone_string());
+    picture.show_pdf(Engine::PdfLatex)?;
 
     Ok(())
 }
