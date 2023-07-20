@@ -7,6 +7,10 @@ pub struct OpinionDistribution {
 }
 
 impl OpinionDistribution {
+    pub fn batch(&mut self, opinion: u16, amount: u64) {
+        self.map.insert(opinion, amount);
+    }
+
     pub fn update(&mut self, old_opinion: Option<u16>, new_opinion: u16) {
         if let Some(old_opinion) = old_opinion {
             self.map.entry(old_opinion).and_modify(|v| *v -= 1);

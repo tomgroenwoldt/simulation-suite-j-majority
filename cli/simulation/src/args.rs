@@ -12,6 +12,12 @@ pub struct Args {
     /// Number of opinions
     #[arg(short, long, default_value_t = 10)]
     pub k: u16,
+    /// Initial consensus configuration
+    ///
+    /// Either adds up to provided n with k provided values or takes k-1 values
+    /// and shifts remaining n to last element
+    #[arg(short, long, default_values_t = [5, 5, 5].to_vec())]
+    pub config: Vec<u64>,
     /// Enables or disables verbose output
     #[command(flatten)]
     pub verbose: Verbosity,
