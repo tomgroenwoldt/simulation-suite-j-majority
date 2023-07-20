@@ -1,13 +1,14 @@
 use agent::Agent;
-use args::Args;
+use config::Config;
+use error::SimulationError;
 use opinion_distribution::OpinionDistribution;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 
 mod agent;
-pub mod args;
+pub mod config;
+mod error;
 mod opinion_distribution;
-mod simulation;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Simulation {
@@ -20,6 +21,8 @@ pub struct Simulation {
     pub j: u8,
     /// Number of opinions
     pub k: u16,
+    /// Initial configuration
+    pub config: Vec<u64>,
     /// Stores number of occurences for each opinion
     #[serde(skip_deserializing, skip_serializing)]
     pub opinion_distribution: OpinionDistribution,
@@ -28,28 +31,30 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(args: &Args) -> Self {
-        let mut rng = rand::thread_rng();
-
-        // Create agents with random opinions and generate the opinion
-        // distribution.
+    pub fn new(config: Config) -> Result<Self, SimulationError> {
         let mut agents = vec![];
         let mut opinion_distribution = OpinionDistribution::default();
-        let choices = (0..args.k).collect::<Vec<u16>>();
-        for _ in 0..args.n {
-            let new_opinion = choices.choose(&mut rng).unwrap();
-            opinion_distribution.update(None, *new_opinion);
-            agents.push(Agent::new(*new_opinion));
+        let choices = (0..config.k).collect::<Vec<u16>>();
+        let weighted_choices = choices
+            .into_iter()
+            .zip(config.config.clone())
+            .collect::<Vec<_>>();
+        for (opinion, weight) in weighted_choices {
+            opinion_distribution.batch(opinion, weight);
+            for _ in 0..weight {
+                agents.push(Agent::new(opinion));
+            }
         }
 
-        Simulation {
+        Ok(Simulation {
             agents,
-            n: args.n,
-            j: args.j,
-            k: args.k,
+            n: config.n,
+            j: config.j,
+            k: config.k,
+            config: config.config,
             opinion_distribution,
             interaction_count: 0,
-        }
+        })
     }
 
     /// Starts the simulation loop and exits if all agents agree on the
