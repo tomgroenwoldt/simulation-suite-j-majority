@@ -17,6 +17,9 @@ pub struct Args {
     /// Initial consensus configuration
     #[arg(short, long, use_value_delimiter = true)]
     pub config: Option<Vec<u64>>,
+    /// Number of simulations to run
+    #[arg(short, long, default_value_t = 10)]
+    pub simulations: usize,
     /// Enables or disables verbose output
     #[command(flatten)]
     pub verbose: Verbosity,
@@ -26,8 +29,8 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn info_simulation_config(self) -> Result<Config> {
-        let config = validate_config(self.config, self.n, self.k)?;
+    pub fn to_simulation_config(&self) -> Result<Config> {
+        let config = validate_config(&self.config, self.n, self.k)?;
         Ok(Config {
             n: self.n,
             j: self.j,
@@ -37,7 +40,7 @@ impl Args {
     }
 }
 
-fn validate_config(config: Option<Vec<u64>>, n: u64, k: u16) -> Result<Vec<u64>> {
+fn validate_config(config: &Option<Vec<u64>>, n: u64, k: u16) -> Result<Vec<u64>> {
     if let Some(config) = config {
         let mut cmd = Args::command();
         if !config.len().eq(&(k as usize)) {
@@ -48,7 +51,7 @@ fn validate_config(config: Option<Vec<u64>>, n: u64, k: u16) -> Result<Vec<u64>>
             .exit();
         }
         if config.iter().sum::<u64>().eq(&n) {
-            return Ok(config);
+            return Ok(config.clone());
         } else {
             cmd.error(
                 clap::error::ErrorKind::ValueValidation,
