@@ -1,4 +1,3 @@
-[![codecov](https://codecov.io/gh/tomgroenwoldt/bachelor-thesis/branch/main/graph/badge.svg?token=FE4062QVEN)](https://codecov.io/gh/tomgroenwoldt/bachelor-thesis)
 # Simulation of Distributed Majority Protocols
 This repository contains my bachelor thesis written in LaTeX and the used simulation software.
 
@@ -20,6 +19,7 @@ Alter the `watch.sh` script to your liking. To start the file watcher run:
 cd thesis/
 ./watch.sh
 ```
+<<<<<<< HEAD
 
 ## Simulation
 The simulation executes the j-Majority protocol on `n` agents with `k` possible opinions.
