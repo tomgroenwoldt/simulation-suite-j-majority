@@ -32,8 +32,8 @@ pub fn generate_triangle(simulations: Vec<Simulation>) -> Picture {
             )
         })
         .collect::<Vec<_>>();
-
     triangle_points.sort_by(|point_one, point_two| point_one.1.cmp(&point_two.1));
+
     let grouped_triangle_points = triangle_points
         .into_iter()
         .group_by(|point| point.1)

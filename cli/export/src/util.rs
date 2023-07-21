@@ -1,6 +1,6 @@
 pub fn map_value_to_color(value: u64, lowest_value: u64, highest_value: u64) -> (u8, u8, u8) {
     // Define the number of color categories
-    let num_categories: u64 = 100;
+    let num_categories: u64 = 25;
 
     // Calculate the value range per category
     let value_range = (highest_value - lowest_value) / num_categories;
