@@ -10,7 +10,7 @@ pub mod config;
 mod error;
 mod opinion_distribution;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Simulation {
     /// Collection of agents
     #[serde(skip_deserializing, skip_serializing)]

@@ -10,7 +10,7 @@ triangle: build-release
         if [[ $((i + j)) -le $n ]]; then
           k=$((n - i - j))
           echo "($i, $j, $k)"
-          ./target/release/simulation_runner -n 100000 -j 3 -k 3 --config $i,$j,$k --output triangle
+          ./target/release/simulation_runner -n 100000 -j 3 -k 3 --config $i,$j,$k --simulations 20 --output triangle
         fi
       done
   done
