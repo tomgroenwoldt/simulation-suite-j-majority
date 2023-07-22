@@ -10,7 +10,7 @@ use simulation::Simulation;
 
 use crate::util::map_value_to_color;
 
-pub fn generate_triangle(simulations: Vec<Simulation>) -> Picture {
+pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Picture {
     let lowest_value = simulations
         .iter()
         .map(|simulation| simulation.interaction_count)
