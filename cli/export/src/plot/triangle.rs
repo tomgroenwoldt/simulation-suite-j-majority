@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use pgfplots::{
     axis::{
@@ -11,31 +13,42 @@ use simulation::Simulation;
 use crate::util::map_value_to_color;
 
 pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Picture {
-    let lowest_value = simulations
-        .iter()
-        .map(|simulation| simulation.interaction_count)
-        .min()
-        .unwrap();
+    let mut point_map = HashMap::new();
+    let mut simulation_counts = HashMap::new();
 
-    let highest_value = simulations
-        .iter()
-        .map(|simulation| simulation.interaction_count)
-        .max()
-        .unwrap();
+    simulations.into_iter().for_each(|simulation| {
+        point_map
+            .entry(simulation.config.clone())
+            .and_modify(|v| *v += simulation.interaction_count)
+            .or_insert(simulation.interaction_count);
+        simulation_counts
+            .entry(simulation.config)
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+    });
 
-    let mut triangle_points = simulations
+    point_map.iter_mut().for_each(|(k, v)| {
+        if let Some(simulation_count) = simulation_counts.get(k) {
+            *v /= simulation_count;
+        }
+    });
+
+    let lowest_value = *point_map.values().min().unwrap();
+    let highest_value = *point_map.values().max().unwrap();
+
+    let triangle_points = point_map
         .into_iter()
-        .map(|simulation| {
+        .map(|point| {
             (
-                simulation.config,
-                map_value_to_color(simulation.interaction_count, lowest_value, highest_value),
+                point.0,
+                map_value_to_color(point.1, lowest_value, highest_value),
             )
         })
         .collect::<Vec<_>>();
-    triangle_points.sort_by(|point_one, point_two| point_one.1.cmp(&point_two.1));
 
     let grouped_triangle_points = triangle_points
         .into_iter()
+        .sorted_by(|point_one, point_two| point_one.1.cmp(&point_two.1))
         .group_by(|point| point.1)
         .into_iter()
         .map(|(_, group)| group.collect::<Vec<_>>())
