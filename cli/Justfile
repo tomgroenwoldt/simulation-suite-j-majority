@@ -2,6 +2,7 @@ build:
 	cargo build
 build-release:
 	cargo build --release
+
 triangle: build-release
   #!/usr/bin/env bash
   n=100000
@@ -13,7 +14,34 @@ triangle: build-release
           ./target/release/simulation_runner -n 100000 -j 3 -k 3 --config $i,$j,$k --simulations 20 --output triangle
         fi
       done
-  done
-
+  	done
 render-triangle:
 	cargo run --release --bin export -- -i output/triangle/simulation.json triangle
+
+k-plot: build-release
+  #!/usr/bin/env bash
+  total_k=50
+  total_j=12
+    for ((k = 2; k <= total_k; k+=1)); do
+      for ((j = 3; j <= total_j; j+=1)); do
+        echo "Running simulation with k=$k and j=$j"
+        ./target/release/simulation_runner -n 100000 -j $j -k $k --simulations 10 --output k-plot
+      done
+    done
+
+render-k-plot:
+	cargo run --release --bin export -- -i output/k-plot/simulation.json k
+
+n-plot: build-release
+  #!/usr/bin/env bash
+  total_n=100000
+  total_j=12
+    for ((n = 1000; n <= total_n; n+=1000)); do
+      for ((j = 3; j <= total_j; j+=1)); do
+        echo "Running simulation with n=$n and j=$j"
+        ./target/release/simulation_runner -n $n -j $j -k 3 --simulations 10 --output n-plot
+      done
+    done
+
+render-n-plot:
+	cargo run --release --bin export -- -i output/n-plot/simulation.json n

@@ -3,8 +3,9 @@ use std::fs::read_to_string;
 use anyhow::Result;
 use clap::Parser;
 
-use args::Args;
 use pgfplots::Engine;
+
+use args::Args;
 use plot::{PictureGeneration, Plot};
 use simulation::Simulation;
 
