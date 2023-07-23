@@ -12,7 +12,7 @@ triangle: build-release
         if [[ $((i + j)) -le $n ]]; then
           k=$((n - i - j))
           echo "($i, $j, $k)"
-          ./target/release/simulation_runner -n $n -j 3 -k 3 --config $i,$j,$k --simulations 20 --output triangle
+          ./target/release/simulation_runner -n $n -j 3 -k 3 --config $i,$j,$k --batch-size 20 --output triangle
         fi
       done
   	done
@@ -20,45 +20,16 @@ render-triangle:
 	cargo run --release --bin export -- -i output/triangle/simulation.json triangle
 
 k-plot: build-release
-  #!/usr/bin/env bash
-  rm -r output/k-plot
-  total_k=50
-  total_j=12
-    for ((k = 2; k <= total_k; k+=1)); do
-      for ((j = 3; j <= total_j; j+=1)); do
-        echo "Running simulation with k=$k and j=$j"
-        ./target/release/simulation_runner -n 100000 -j $j -k $k --simulations 10 --output k-plot
-      done
-    done
-
+	./target/release/simulation_runner --total-k 50 --total-j 12 --output k-plot
 render-k-plot:
 	cargo run --release --bin export -- -i output/k-plot/simulation.json k
 
 n-plot: build-release
-  #!/usr/bin/env bash
-  rm -r output/n-plot
-  total_n=100000
-  total_j=12
-    for ((n = 1000; n <= total_n; n+=1000)); do
-      for ((j = 3; j <= total_j; j+=1)); do
-        echo "Running simulation with n=$n and j=$j"
-        ./target/release/simulation_runner -n $n -j $j -k 3 --simulations 10 --output n-plot
-      done
-    done
-
+	./target/release/simulation_runner --n 1000 --n-step-size 1000 --total-n 100000 --total-j 12 --batch-size 10 --output n-plot
 render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n
 
 entropy-plot: build-release
-  #!/usr/bin/env bash
-  rm -r output/entropy-plot
-  total_j=12
-  n=100000
-  k=5
-  for ((j = 3; j <= total_j; j+=1)); do
-    echo "Running 50 simulations with n=$n, j=$j and k=$k"
-    ./target/release/simulation_runner -n $n -j $j -k $k --simulations 50 --output entropy-plot
-  done
-
+	./target/release/simulation_runner --total-j 12 --batch-size 50 --output entropy-plot
 render-entropy-plot:
 	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy
