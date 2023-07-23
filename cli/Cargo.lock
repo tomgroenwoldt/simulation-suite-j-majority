@@ -490,8 +490,6 @@ dependencies = [
  "anyhow",
  "clap",
  "clap-verbosity-flag",
- "env_logger",
- "log",
  "serde_json",
  "simulation",
 ]
