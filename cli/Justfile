@@ -5,13 +5,14 @@ build-release:
 
 triangle: build-release
   #!/usr/bin/env bash
+  rm -r output/triangle
   n=100000
     for ((i = 0; i <= n; i+=1000)); do
       for ((j = 0; j <= n- i; j+=1000)); do
         if [[ $((i + j)) -le $n ]]; then
           k=$((n - i - j))
           echo "($i, $j, $k)"
-          ./target/release/simulation_runner -n 100000 -j 3 -k 3 --config $i,$j,$k --simulations 20 --output triangle
+          ./target/release/simulation_runner -n $n -j 3 -k 3 --config $i,$j,$k --simulations 20 --output triangle
         fi
       done
   	done
@@ -20,6 +21,7 @@ render-triangle:
 
 k-plot: build-release
   #!/usr/bin/env bash
+  rm -r output/k-plot
   total_k=50
   total_j=12
     for ((k = 2; k <= total_k; k+=1)); do
@@ -34,6 +36,7 @@ render-k-plot:
 
 n-plot: build-release
   #!/usr/bin/env bash
+  rm -r output/n-plot
   total_n=100000
   total_j=12
     for ((n = 1000; n <= total_n; n+=1000)); do
@@ -45,3 +48,17 @@ n-plot: build-release
 
 render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n
+
+entropy-plot: build-release
+  #!/usr/bin/env bash
+  rm -r output/entropy-plot
+  total_j=12
+  n=100000
+  k=5
+  for ((j = 3; j <= total_j; j+=1)); do
+    echo "Running 50 simulations with n=$n, j=$j and k=$k"
+    ./target/release/simulation_runner -n $n -j $j -k $k --simulations 50 --output entropy-plot
+  done
+
+render-entropy-plot:
+	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy

@@ -1,9 +1,10 @@
-use agent::Agent;
-use config::Config;
 use error::SimulationError;
 use opinion_distribution::OpinionDistribution;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
+
+use agent::Agent;
+use config::Config;
 
 mod agent;
 pub mod config;
@@ -28,6 +29,7 @@ pub struct Simulation {
     pub opinion_distribution: OpinionDistribution,
     /// Number of interactions
     pub interaction_count: u64,
+    pub entropy: Vec<(u64, f64)>,
 }
 
 impl Simulation {
@@ -54,6 +56,7 @@ impl Simulation {
             config: config.config,
             opinion_distribution,
             interaction_count: 0,
+            entropy: vec![],
         })
     }
 
@@ -62,6 +65,10 @@ impl Simulation {
     pub fn execute(&mut self) {
         let mut rng = rand::thread_rng();
         while !self.reached_consensus() {
+            if self.interaction_count % self.n == 0 {
+                self.calculate_entropy();
+            }
+
             self.interact(&mut rng);
         }
     }
@@ -79,6 +86,22 @@ impl Simulation {
             chosen_agent.update(&sample, &mut self.opinion_distribution);
             self.interaction_count += 1;
         }
+    }
+
+    pub fn calculate_entropy(&mut self) {
+        let opinion_percentages = self
+            .opinion_distribution
+            .map
+            .values()
+            .map(|agents_with_opinion| *agents_with_opinion as f64 / self.n as f64)
+            .collect::<Vec<f64>>();
+        let mut entropy = 0.0;
+        for percentage in opinion_percentages.into_iter() {
+            if percentage != 0.0 {
+                entropy -= percentage * percentage.log(self.k as f64);
+            }
+        }
+        self.entropy.push((self.interaction_count, entropy));
     }
 
     fn reached_consensus(&mut self) -> bool {
