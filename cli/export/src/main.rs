@@ -30,7 +30,6 @@ fn main() -> Result<()> {
         simulations,
     };
     let picture = plot.generate_picture();
-    println!("{}", picture.standalone_string());
     picture.show_pdf(Engine::PdfLatex)?;
 
     Ok(())
