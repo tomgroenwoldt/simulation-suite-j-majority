@@ -1,10 +1,11 @@
 use std::{fs::read_to_string, time::Instant};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 
 use common::{CHECKMARK, FACTORY, FOLDER, GRAPH, TOOLS};
 use console::style;
+use indicatif::HumanDuration;
 use pgfplots::Engine;
 
 use args::Args;
@@ -51,13 +52,15 @@ fn main() -> Result<()> {
         console::style("[4/5]").bold().dim(),
         FOLDER
     );
-    picture.show_pdf(Engine::PdfLatex)?;
+    picture
+        .show_pdf(Engine::Tectonic)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     println!(
-        "{} {} Generated and opened plot in {}ms",
+        "{} {} Generated and opened plot in {}",
         style("[5/5]").bold().dim(),
         CHECKMARK,
-        started.elapsed().as_millis()
+        HumanDuration(started.elapsed())
     );
     Ok(())
 }
