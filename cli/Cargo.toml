@@ -4,4 +4,5 @@ members = [
   "simulation",
   "simulation_runner",
   "export",
+  "common"
 ]

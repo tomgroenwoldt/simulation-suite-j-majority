@@ -1,8 +1,10 @@
-use std::fs::read_to_string;
+use std::{fs::read_to_string, time::Instant};
 
 use anyhow::Result;
 use clap::Parser;
 
+use common::{CHECKMARK, FACTORY, FOLDER, GRAPH, TOOLS};
+use console::style;
 use pgfplots::Engine;
 
 use args::Args;
@@ -14,23 +16,48 @@ mod plot;
 mod util;
 
 fn main() -> Result<()> {
-    // Parse CLI arguments and initialize logger
+    let started = Instant::now();
+    println!(
+        "{} {} Parse arguments...",
+        console::style("[1/5]").bold().dim(),
+        TOOLS
+    );
     let args = Args::parse();
-    env_logger::Builder::new()
-        .filter_level(args.verbose.log_level_filter())
-        .init();
 
     // Extract simulations from input file
+    println!(
+        "{} {} Extract simulation data...",
+        console::style("[2/5]").bold().dim(),
+        FACTORY
+    );
     let input_file_content = &read_to_string(&args.input)?;
     let simulations: Vec<Simulation> = serde_json::from_str(input_file_content)?;
 
-    // Generate pgfplot
+    // Generate plot
+    println!(
+        "{} {} Generate plot...",
+        console::style("[3/5]").bold().dim(),
+        GRAPH
+    );
     let plot = Plot {
         plot_type: args.plot_type,
         simulations,
     };
     let picture = plot.generate_picture();
+
+    // Open plot in default PDF viewer
+    println!(
+        "{} {} Open plot in default PDF viewer...",
+        console::style("[4/5]").bold().dim(),
+        FOLDER
+    );
     picture.show_pdf(Engine::PdfLatex)?;
 
+    println!(
+        "{} {} Generated and opened plot in {}ms",
+        style("[5/5]").bold().dim(),
+        CHECKMARK,
+        started.elapsed().as_millis()
+    );
     Ok(())
 }
