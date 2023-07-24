@@ -7,16 +7,15 @@ use std::time::Instant;
 
 use anyhow::Result;
 use clap::Parser;
+use common::{create_progress_bar, CHECKMARK, FLOPPY_DISK, ROCKET, TOOLS};
 use console::style;
 use indicatif::HumanDuration;
 
 use args::{get_simulation_config, Args};
-use indicator::{create_progress_bar, CHECKMARK, FLOPPY_DISK, ROCKET, TOOLS};
 use simulation::config::Config;
 use simulation::Simulation;
 
 mod args;
-mod indicator;
 
 fn main() -> Result<()> {
     let started = Instant::now();
