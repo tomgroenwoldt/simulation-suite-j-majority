@@ -6,9 +6,6 @@ pub struct Config {
     pub j: u8,
     /// Number of opinions
     pub k: u16,
-    /// # Initial consensus configuration
-    ///
-    /// Either adds up to provided n with k provided values or takes k-1 values
-    /// and shifts remaining n to last element
+    /// Initial consensus configuration
     pub config: Vec<u64>,
 }
