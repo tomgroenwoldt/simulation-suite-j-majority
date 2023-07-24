@@ -11,8 +11,8 @@ pub struct Args {
     /// Upper treshold for n
     ///
     /// Set to simulate for all [n, total_n]
-    #[arg(long, default_value_t = 100000)]
-    pub total_n: u64,
+    #[arg(long)]
+    pub total_n: Option<u64>,
     #[arg(long, default_value_t = 1000)]
     pub n_step_size: u64,
     /// Sample size
@@ -21,8 +21,8 @@ pub struct Args {
     /// Upper treshold for j
     ///
     /// Set to simulate for all [j, total_j]
-    #[arg(long, default_value_t = 3)]
-    pub total_j: u8,
+    #[arg(long)]
+    pub total_j: Option<u8>,
     #[arg(long, default_value_t = 1)]
     pub j_step_size: u8,
     /// Number of opinions
@@ -31,8 +31,8 @@ pub struct Args {
     /// Upper treshold for k
     ///
     /// Set to simulate for all [k, total_k]
-    #[arg(long, default_value_t = 2)]
-    pub total_k: u16,
+    #[arg(long)]
+    pub total_k: Option<u16>,
     #[arg(long, default_value_t = 1)]
     pub k_step_size: u16,
     /// Initial consensus configuration
