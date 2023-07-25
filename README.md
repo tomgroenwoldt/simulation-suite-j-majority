@@ -36,6 +36,7 @@ To list all available plots run:
 ```bash
 ./export --input output/example-k-plot/simulation.json k
 ```
+![example-k-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/fc75218b-a042-4239-9387-a8efdd98c9c1)
 
 #### N-Plot
 ```bash
@@ -44,6 +45,7 @@ To list all available plots run:
 ```bash
 ./export --input output/example-n-plot/simulation.json n
 ```
+![example-n-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/0ce87804-002c-4449-a81d-a42602070f84)
 
 #### "Triangle"-Initial-Configuration
 You can still utilize bash scripts for specific scenarios like simulating all
@@ -66,6 +68,8 @@ The `export` binary still has to support your desired plot output though:
 ```bash
 ./export --input output/example-n-plot/simulation.json triangle
 ```
+![example-triangle-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/d27e38ae-64b1-42bb-99d7-d44ad156fcf4)
+
 
 ## LaTeX
 
