@@ -13,7 +13,11 @@ use simulation::Simulation;
 
 use crate::util::{map_sample_size_to_color, map_sample_size_to_markshape};
 
-pub fn generate_k_plot(simulations: Vec<Simulation>) -> Picture {
+pub fn generate_k_plot(simulations: Vec<Simulation>) -> Option<Picture> {
+    if simulations.len().eq(&0) {
+        return None;
+    }
+
     let mut point_map = HashMap::new();
     let mut simulation_counts = HashMap::new();
 
@@ -94,5 +98,5 @@ pub fn generate_k_plot(simulations: Vec<Simulation>) -> Picture {
     axis.add_key(AxisKey::Custom(String::from("xmode=log")));
     axis.add_key(AxisKey::Custom(String::from("log ticks with fixed point")));
     axis.plots = plots;
-    Picture::from(axis)
+    Some(Picture::from(axis))
 }

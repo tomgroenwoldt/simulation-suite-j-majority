@@ -5,13 +5,12 @@ build-release:
 
 triangle: build-release
 	#!/usr/bin/env bash
-	rm -r output/triangle
 	n=100000
-	for ((i = 0; i <= n; i+=5000)); do
-	  for ((j = 0; j <= n- i; j+=5000)); do
+	for ((i = 0; i <= n; i+=1000)); do
+	  for ((j = 0; j <= n- i; j+=1000)); do
 	    if [[ $((i + j)) -le $n ]]; then
 	      k=$((n - i - j))
-	      ./target/release/simulation_runner -n $n -j 3 -k 3 --initial-config $i,$j,$k --batch-size 20 --output triangle > /dev/null 2> /dev/null
+	      ./target/release/simulation_runner -n $n -j 3 -k 3 --initial-config $i,$j,$k --batch-size 20 --model gossip --output triangle > /dev/null 2> /dev/null
 	    fi
 	  done
 	done
@@ -19,16 +18,16 @@ render-triangle:
 	cargo run --release --bin export -- -i output/triangle/simulation.json triangle
 
 k-plot: build-release
-	./target/release/simulation_runner --total-k 50 --total-j 12 --output k-plot
+	./target/release/simulation_runner --total-k 25 --total-j 12 --model gossip --output k-plot
 render-k-plot:
 	cargo run --release --bin export -- -i output/k-plot/simulation.json k
 
 n-plot: build-release
-	./target/release/simulation_runner --n 1000 --n-step-size 1000 --total-n 100000 --total-j 12 --batch-size 10 --output n-plot
+	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --batch-size 50 --model gossip --output n-plot
 render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n
 
 entropy-plot: build-release
-	./target/release/simulation_runner --total-j 12 --batch-size 50 --output entropy-plot
+	./target/release/simulation_runner --total-j 12 --batch-size 50 --model population --output entropy-plot
 render-entropy-plot:
 	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy

@@ -44,7 +44,7 @@ fn main() -> Result<()> {
         plot_type: args.plot_type,
         simulations,
     };
-    let picture = plot.generate_picture();
+    let (gossip_picture, population_picture) = plot.generate_picture();
 
     // Open plot in default PDF viewer
     println!(
@@ -52,9 +52,16 @@ fn main() -> Result<()> {
         console::style("[4/5]").bold().dim(),
         FOLDER
     );
-    picture
-        .show_pdf(Engine::Tectonic)
-        .map_err(|e| anyhow!(e.to_string()))?;
+    if let Some(picture) = gossip_picture {
+        picture
+            .show_pdf(Engine::Tectonic)
+            .map_err(|e| anyhow!(e.to_string()))?;
+    }
+    if let Some(picture) = population_picture {
+        picture
+            .show_pdf(Engine::Tectonic)
+            .map_err(|e| anyhow!(e.to_string()))?;
+    }
 
     println!(
         "{} {} Generated and opened plot in {}",

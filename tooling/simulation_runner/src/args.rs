@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use clap_verbosity_flag::Verbosity;
-use simulation::config::Config;
+use simulation::{config::Config, Model};
 
 #[derive(Clone, Parser)]
 pub struct Args {
@@ -36,17 +36,19 @@ pub struct Args {
     #[arg(long, default_value_t = 1)]
     pub k_step_size: u16,
     /// Initial consensus configuration
-    #[arg(short, long, use_value_delimiter = true)]
+    #[arg(long, use_value_delimiter = true)]
     pub initial_config: Option<Vec<u64>>,
     /// Number of simulations to run
-    #[arg(short, long, default_value_t = 10)]
+    #[arg(long, default_value_t = 10)]
     pub batch_size: usize,
-    /// Enables or disables verbose output
-    #[command(flatten)]
-    pub verbose: Verbosity,
+    #[arg(long)]
+    pub model: Model,
     /// Folder to store files
     #[arg(short, long)]
     pub output: String,
+    /// Enables or disables verbose output
+    #[command(flatten)]
+    pub verbose: Verbosity,
 }
 
 /// # Get simulation config
@@ -57,9 +59,16 @@ pub fn get_simulation_config(
     j: u8,
     k: u16,
     initial_config: &Option<Vec<u64>>,
+    model: Model,
 ) -> Result<Config> {
     let config = validate_initial_config(initial_config, n, k)?;
-    Ok(Config { n, j, k, config })
+    Ok(Config {
+        n,
+        j,
+        k,
+        config,
+        model,
+    })
 }
 
 /// # Validate initial config

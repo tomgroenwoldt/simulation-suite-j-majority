@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use error::SimulationError;
 use opinion_distribution::OpinionDistribution;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
@@ -10,6 +11,21 @@ mod agent;
 pub mod config;
 mod error;
 mod opinion_distribution;
+
+#[derive(Clone, Debug, Deserialize, Serialize, ValueEnum)]
+pub enum Model {
+    Gossip,
+    Population,
+}
+
+impl std::fmt::Display for Model {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Model::Gossip => write!(f, "gossip"),
+            Model::Population => write!(f, "population"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Simulation {
@@ -30,6 +46,7 @@ pub struct Simulation {
     /// Number of interactions
     pub interaction_count: u64,
     pub entropy: Vec<(u64, f64)>,
+    pub model: Model,
 }
 
 impl Simulation {
@@ -57,6 +74,7 @@ impl Simulation {
             opinion_distribution,
             interaction_count: 0,
             entropy: vec![],
+            model: config.model,
         })
     }
 
@@ -64,16 +82,25 @@ impl Simulation {
     /// same opinion.
     pub fn execute(&mut self) {
         let mut rng = rand::thread_rng();
-        while !self.reached_consensus() {
-            if self.interaction_count % self.n == 0 {
-                self.calculate_entropy();
+        match self.model {
+            Model::Gossip => {
+                while !self.reached_consensus() {
+                    self.calculate_entropy();
+                    self.interact_gossip_model(&mut rng);
+                }
             }
-
-            self.interact(&mut rng);
+            Model::Population => {
+                while !self.reached_consensus() {
+                    if self.interaction_count % self.n == 0 {
+                        self.calculate_entropy();
+                    }
+                    self.interact_population_model(&mut rng);
+                }
+            }
         }
     }
 
-    fn interact(&mut self, rng: &mut ThreadRng) {
+    fn interact_population_model(&mut self, rng: &mut ThreadRng) {
         // Swap a random agent to the first position. This way we can always
         // split the vector via `.split_first_mut()` to work via references.
         self.agents.swap(0, rng.gen_range(0..self.n as usize));
@@ -86,6 +113,18 @@ impl Simulation {
             chosen_agent.update(&sample, &mut self.opinion_distribution);
             self.interaction_count += 1;
         }
+    }
+
+    fn interact_gossip_model(&mut self, rng: &mut ThreadRng) {
+        let old_agents = self.agents.clone();
+        for chosen_agent in self.agents.iter_mut() {
+            let sample = old_agents
+                .choose_multiple(rng, self.j as usize)
+                .cloned()
+                .collect::<Vec<_>>();
+            chosen_agent.update(&sample, &mut self.opinion_distribution);
+        }
+        self.interaction_count += 1;
     }
 
     pub fn calculate_entropy(&mut self) {
