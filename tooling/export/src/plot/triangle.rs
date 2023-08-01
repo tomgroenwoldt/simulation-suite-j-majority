@@ -12,7 +12,11 @@ use simulation::Simulation;
 
 use crate::util::map_value_to_color;
 
-pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Picture {
+pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Option<Picture> {
+    if simulations.len().eq(&0) {
+        return None;
+    }
+
     let mut point_map = HashMap::new();
     let mut simulation_counts = HashMap::new();
 
@@ -85,5 +89,5 @@ pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Picture {
     axis.add_key(AxisKey::Custom(String::from("view={40}{60}")));
     axis.plots = plots;
 
-    Picture::from(axis)
+    Some(Picture::from(axis))
 }

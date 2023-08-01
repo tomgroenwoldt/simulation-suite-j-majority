@@ -49,7 +49,8 @@ fn main() -> Result<()> {
         while k <= total_k {
             let mut j = args.j;
             while j <= total_j {
-                let config = get_simulation_config(n, j, k, &args.initial_config)?;
+                let config =
+                    get_simulation_config(n, j, k, &args.initial_config, args.model.clone())?;
                 progress_bar.set_message(format!("n={n}, k={k}, j={j}"));
                 run_simulations(config, &simulations, args.batch_size)?;
                 progress_bar.inc(1);
