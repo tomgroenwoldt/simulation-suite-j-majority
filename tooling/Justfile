@@ -15,19 +15,19 @@ triangle: build-release
 	  done
 	done
 render-triangle:
-	cargo run --release --bin export -- -i output/triangle/simulation.json triangle
+	cargo run --release --bin export -- -i output/triangle/simulation.json triangle --generate-latex
 
 k-plot: build-release
 	./target/release/simulation_runner --total-k 25 --total-j 12 --model gossip --output k-plot
 render-k-plot:
-	cargo run --release --bin export -- -i output/k-plot/simulation.json k
+	cargo run --release --bin export -- -i output/k-plot/simulation.json k --generate-latex
 
 n-plot: build-release
-	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --batch-size 50 --model gossip --output n-plot
+	./target/release/simulation_runner --n 10000 --n-step-size 10000 --total-n 100000 --total-j 12 --batch-size 50 --model population --output n-plot
 render-n-plot:
-	cargo run --release --bin export -- -i output/n-plot/simulation.json n
+	cargo run --release --bin export -- -i output/n-plot/simulation.json n --generate-latex
 
 entropy-plot: build-release
-	./target/release/simulation_runner --total-j 12 --batch-size 50 --model population --output entropy-plot
+	./target/release/simulation_runner --total-j 12 --batch-size 50 --model gossip --output entropy-plot
 render-entropy-plot:
-	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy
+	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy --generate-latex

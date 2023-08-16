@@ -16,6 +16,8 @@ pub struct Args {
     pub verbose: Verbosity,
     #[arg(value_enum)]
     pub plot_type: PlotType,
+    #[arg(long, default_value_t = false)]
+    pub generate_latex: bool,
 }
 
 fn file_exists(s: &str) -> Result<String> {
