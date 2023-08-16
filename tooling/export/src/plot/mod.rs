@@ -3,11 +3,14 @@ use pgfplots::Picture;
 use simulation::Simulation;
 
 use self::{
-    entropy::generate_entropy_plot, j::generate_j_plot, k::generate_k_plot, n::generate_n_plot,
+    entropy_j::generate_entropy_j_plot, entropy_k::generate_entropy_k_plot,
+    entropy_n::generate_entropy_n_plot, j::generate_j_plot, k::generate_k_plot, n::generate_n_plot,
     triangle::generate_triangle_plot,
 };
 
-mod entropy;
+mod entropy_j;
+mod entropy_k;
+mod entropy_n;
 mod j;
 mod k;
 mod n;
@@ -20,7 +23,9 @@ pub struct Plot {
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum PlotType {
-    Entropy,
+    EntropyOverJ,
+    EntropyOverK,
+    EntropyOverN,
     J,
     K,
     N,
@@ -43,9 +48,17 @@ impl PictureGeneration for Plot {
             });
 
         match self.plot_type {
-            PlotType::Entropy => (
-                generate_entropy_plot(gossip_simulations, error_bars),
-                generate_entropy_plot(population_simulations, error_bars),
+            PlotType::EntropyOverJ => (
+                generate_entropy_j_plot(gossip_simulations, error_bars),
+                generate_entropy_j_plot(population_simulations, error_bars),
+            ),
+            PlotType::EntropyOverK => (
+                generate_entropy_k_plot(gossip_simulations, error_bars),
+                generate_entropy_k_plot(population_simulations, error_bars),
+            ),
+            PlotType::EntropyOverN => (
+                generate_entropy_n_plot(gossip_simulations, error_bars),
+                generate_entropy_n_plot(population_simulations, error_bars),
             ),
             PlotType::J => (
                 generate_j_plot(gossip_simulations, error_bars),
