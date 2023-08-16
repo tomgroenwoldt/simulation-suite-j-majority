@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         plot_type: args.plot_type,
         simulations,
     };
-    let (gossip_picture, population_picture) = plot.generate_picture();
+    let (gossip_picture, population_picture) = plot.generate_picture(args.error_bars);
 
     if args.generate_latex {
         if let Some(picture) = &population_picture {

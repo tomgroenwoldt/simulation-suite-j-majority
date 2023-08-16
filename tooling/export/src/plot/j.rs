@@ -13,7 +13,7 @@ use simulation::Simulation;
 
 use crate::util::{map_sample_size_to_color, map_sample_size_to_markshape};
 
-pub fn generate_k_plot(simulations: Vec<Simulation>, error_bars: bool) -> Option<Picture> {
+pub fn generate_j_plot(simulations: Vec<Simulation>, error_bars: bool) -> Option<Picture> {
     if simulations.len().eq(&0) {
         return None;
     }
@@ -23,11 +23,11 @@ pub fn generate_k_plot(simulations: Vec<Simulation>, error_bars: bool) -> Option
 
     simulations.iter().for_each(|simulation| {
         point_map
-            .entry((simulation.k, simulation.j))
+            .entry((simulation.j, simulation.k))
             .and_modify(|v| *v += simulation.interaction_count)
             .or_insert(simulation.interaction_count);
         simulation_counts
-            .entry((simulation.k, simulation.j))
+            .entry((simulation.j, simulation.k))
             .and_modify(|v| *v += 1)
             .or_insert(1);
     });
@@ -40,16 +40,16 @@ pub fn generate_k_plot(simulations: Vec<Simulation>, error_bars: bool) -> Option
 
     let grouped_points = point_map
         .into_iter()
-        .sorted_by(|((_, first_j), _), ((_, second_j), _)| first_j.cmp(second_j))
-        .group_by(|((_, j), _)| *j)
+        .sorted_by(|((_, first_k), _), ((_, second_k), _)| first_k.cmp(second_k))
+        .group_by(|((_, k), _)| *k)
         .into_iter()
-        .map(|(j, group)| {
+        .map(|(k, group)| {
             (
-                j,
+                k,
                 group
                     .collect::<Vec<_>>()
                     .into_iter()
-                    .map(|((k, _), interaction_count)| (k, interaction_count))
+                    .map(|((j, _), interaction_count)| (j, interaction_count))
                     .collect_vec(),
             )
         })
@@ -59,48 +59,35 @@ pub fn generate_k_plot(simulations: Vec<Simulation>, error_bars: bool) -> Option
     let mut entries = vec![];
     grouped_points
         .into_iter()
-        .sorted_by(|(first_j, _), (second_j, _)| first_j.cmp(second_j))
-        .for_each(|(j, points)| {
+        .sorted_by(|(first_k, _), (second_k, _)| first_k.cmp(second_k))
+        .for_each(|(k, points)| {
             let mut pgf_plot = Plot2D::new();
             pgf_plot.coordinates = points
                 .into_iter()
-                .map(|(k, interaction_count)| {
-                    // Get the maximum y value
-                    let error_y = if let Some(min) = simulations
-                        .iter()
-                        .filter(|simulation| simulation.j.eq(&j) && simulation.k.eq(&k))
-                        .map(|simulation| simulation.interaction_count)
-                        .min()
-                    {
-                        min as f64 / 4.0
-                    } else {
-                        0 as f64
-                    };
-                    (k as f64, interaction_count as f64, None, Some(error_y)).into()
-                })
+                .map(|(j, interaction_count)| (j as f64, interaction_count as f64).into())
                 .collect_vec();
             pgf_plot.add_key(PlotKey::Marker(Marker::new(
-                map_sample_size_to_markshape(j),
+                map_sample_size_to_markshape(k as u8),
                 vec![],
             )));
-            pgf_plot.add_key(map_sample_size_to_color(j));
+            pgf_plot.add_key(map_sample_size_to_color(k as u8));
             pgf_plot.add_key(PlotKey::Type2D(pgfplots::axis::plot::Type2D::OnlyMarks));
             if error_bars {
                 pgf_plot.add_key(PlotKey::YError(ErrorCharacter::Absolute));
                 pgf_plot.add_key(PlotKey::YErrorDirection(ErrorDirection::Both));
             }
             plots.push(pgf_plot.into());
-            entries.push(j);
+            entries.push(k);
         });
 
     entries.dedup();
 
     let mut axis = Axis::new();
-    axis.set_x_label("Opinions");
+    axis.set_x_label("Sample rate");
     axis.set_y_label("Interactions");
     let entries = entries
         .into_iter()
-        .map(|j| format!("{}-Maj.", j))
+        .map(|k| format!("{}", k))
         .collect_vec()
         .join(",");
     axis.add_key(AxisKey::Custom(format!("legend entries={{{}}}", entries)));
