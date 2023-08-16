@@ -1,4 +1,8 @@
-use std::{fs::read_to_string, time::Instant};
+use std::{
+    fs::{read_to_string, File},
+    io::Write,
+    time::Instant,
+};
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -46,18 +50,33 @@ fn main() -> Result<()> {
     };
     let (gossip_picture, population_picture) = plot.generate_picture();
 
+    if args.generate_latex {
+        if let Some(picture) = &population_picture {
+            let mut plot = String::new();
+            let mut file = File::create("population.tex")?;
+            plot.push_str(&picture.standalone_string());
+            file.write_all(plot.as_bytes())?;
+        }
+        if let Some(picture) = &gossip_picture {
+            let mut plot = String::new();
+            let mut file = File::create("gossip.tex")?;
+            plot.push_str(&picture.standalone_string());
+            file.write_all(plot.as_bytes())?;
+        }
+    }
+
     // Open plot in default PDF viewer
     println!(
         "{} {} Open plot in default PDF viewer...",
         console::style("[4/5]").bold().dim(),
         FOLDER
     );
-    if let Some(picture) = gossip_picture {
+    if let Some(picture) = population_picture {
         picture
             .show_pdf(Engine::Tectonic)
             .map_err(|e| anyhow!(e.to_string()))?;
     }
-    if let Some(picture) = population_picture {
+    if let Some(picture) = gossip_picture {
         picture
             .show_pdf(Engine::Tectonic)
             .map_err(|e| anyhow!(e.to_string()))?;
