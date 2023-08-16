@@ -12,7 +12,7 @@ use simulation::Simulation;
 
 use crate::util::map_value_to_color;
 
-pub fn generate_triangle_plot(simulations: Vec<Simulation>) -> Option<Picture> {
+pub fn generate_triangle_plot(simulations: Vec<Simulation>, _error_bars: bool) -> Option<Picture> {
     if simulations.len().eq(&0) {
         return None;
     }

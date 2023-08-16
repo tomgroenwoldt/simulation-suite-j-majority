@@ -21,6 +21,13 @@ k-plot: build-release
 	./target/release/simulation_runner --total-k 25 --total-j 12 --model gossip --output k-plot
 render-k-plot:
 	cargo run --release --bin export -- -i output/k-plot/simulation.json k --generate-latex
+render-k-plot-with-error-bars:
+	cargo run --release --bin export -- -i output/k-plot/simulation.json k --generate-latex --error-bars
+
+j-plot: build-release
+	./target/release/simulation_runner --total-k 12 --total-j 25 --batch-size 100 --model gossip --output j-plot
+render-j-plot:
+	cargo run --release --bin export -- -i output/j-plot/simulation.json j --generate-latex
 
 n-plot: build-release
 	./target/release/simulation_runner --n 10000 --n-step-size 10000 --total-n 100000 --total-j 12 --batch-size 50 --model population --output n-plot
@@ -28,6 +35,6 @@ render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n --generate-latex
 
 entropy-plot: build-release
-	./target/release/simulation_runner --total-j 12 --batch-size 50 --model gossip --output entropy-plot
+	./target/release/simulation_runner --n 10000 --n-step-size 10000 --total-n 100000 --total-j 12 --batch-size 50 --model gossip --output entropy-plot
 render-entropy-plot:
 	cargo run --release --bin export -- -i output/entropy-plot/simulation.json entropy --generate-latex

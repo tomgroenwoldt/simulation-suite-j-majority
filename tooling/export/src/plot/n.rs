@@ -13,7 +13,7 @@ use simulation::Simulation;
 
 use crate::util::{map_sample_size_to_color, map_sample_size_to_markshape};
 
-pub fn generate_n_plot(simulations: Vec<Simulation>) -> Option<Picture> {
+pub fn generate_n_plot(simulations: Vec<Simulation>, _error_bars: bool) -> Option<Picture> {
     if simulations.len().eq(&0) {
         return None;
     }
