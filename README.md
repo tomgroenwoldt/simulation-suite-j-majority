@@ -9,7 +9,9 @@ The `simulation_runner` binary replaces the usage of bash scripts and helps
 exporting the simulated data. The `export` binary processes this data and
 produces high quality `LaTeX` plots. Everything is written in [Rust](https://rust-lang.org).
 ### Simulation runner
-![simulation_runner](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/46a7b21b-182a-4b8e-a545-67f4b7a4846a)
+![simulation_runner_demo](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/d44ffbfd-93f3-4d70-bffc-be3483ea473d)
+
+
 
 The `simulation_runner` accepts a variety of input flags. To get started execute:
 ```bash
@@ -19,7 +21,9 @@ All simulated data is stored in `JSON` format inside `output/<your-folder>/simul
 is supplied via the `--output` flag.
 
 ### Export
-![export](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/b48428de-2a62-42c7-ac74-9a0323576524)
+![export_demo](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/e9bda3ee-3ffe-4bbe-be2f-4896c0e090b3)
+
+
 
 The `export` binary takes the produced data of the `simulation_runner` as input
 via `--input output/<your-folder>/simulation.json` and produces a plot specified by the user.
