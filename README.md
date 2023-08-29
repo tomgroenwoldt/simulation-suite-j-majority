@@ -9,7 +9,7 @@ The `simulation_runner` binary replaces the usage of bash scripts and helps
 exporting the simulated data. The `export` binary processes this data and
 produces high quality `LaTeX` plots. Everything is written in [Rust](https://rust-lang.org).
 ### Simulation runner
-![simulation_runner](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/46a7b21b-182a-4b8e-a545-67f4b7a4846a)
+![simulation_runner](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/46a7b21b-182a-4b8e-a545-67f4b7a4846a)
 
 The `simulation_runner` accepts a variety of input flags. To get started execute:
 ```bash
@@ -19,7 +19,7 @@ All simulated data is stored in `JSON` format inside `output/<your-folder>/simul
 is supplied via the `--output` flag.
 
 ### Export
-![export](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/b48428de-2a62-42c7-ac74-9a0323576524)
+![export](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/b48428de-2a62-42c7-ac74-9a0323576524)
 
 The `export` binary takes the produced data of the `simulation_runner` as input
 via `--input output/<your-folder>/simulation.json` and produces a plot specified by the user.
@@ -36,7 +36,7 @@ To list all available plots run:
 ```bash
 ./export --input output/example-k-plot/simulation.json k
 ```
-![example-k-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/fc75218b-a042-4239-9387-a8efdd98c9c1)
+![example-k-plot-1](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/fc75218b-a042-4239-9387-a8efdd98c9c1)
 
 #### N-Plot
 ```bash
@@ -45,7 +45,7 @@ To list all available plots run:
 ```bash
 ./export --input output/example-n-plot/simulation.json n
 ```
-![example-n-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/0ce87804-002c-4449-a81d-a42602070f84)
+![example-n-plot-1](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/0ce87804-002c-4449-a81d-a42602070f84)
 
 #### "Triangle"-Initial-Configuration
 You can still utilize bash scripts for specific scenarios like simulating all
@@ -68,7 +68,7 @@ The `export` binary still has to support your desired plot output though:
 ```bash
 ./export --input output/example-n-plot/simulation.json triangle
 ```
-![example-triangle-plot-1](https://github.com/tomgroenwoldt/bachelor-thesis/assets/70777530/d27e38ae-64b1-42bb-99d7-d44ad156fcf4)
+![example-triangle-plot-1](https://github.com/tomgroenwoldt/simulation-suite-j-majority/assets/70777530/d27e38ae-64b1-42bb-99d7-d44ad156fcf4)
 
 
 ## LaTeX
