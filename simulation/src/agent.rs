@@ -1,6 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub struct Agent {
     pub opinion: u16,
 }
@@ -17,7 +15,7 @@ impl Agent {
 
     /// Executes the interaction for an agent and a given sample and updates the simulations
     /// interaction count. Returns the updated opinion as an option.
-    pub fn update(&mut self, sample: &[Agent], opinion_distribution: &mut OpinionDistribution) {
+    pub fn update(&mut self, sample: Vec<&Agent>, opinion_distribution: &mut OpinionDistribution) {
         // Counts the occurence of each opinion and find the major opinion.
         let mut counts = HashMap::new();
         sample.iter().for_each(|agent| {

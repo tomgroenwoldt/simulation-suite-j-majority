@@ -107,10 +107,9 @@ impl Simulation {
         if let Some((chosen_agent, remaining)) = self.agents.split_first_mut() {
             let sample = remaining
                 .choose_multiple(rng, self.j as usize)
-                .cloned()
                 .collect::<Vec<_>>();
 
-            chosen_agent.update(&sample, &mut self.opinion_distribution);
+            chosen_agent.update(sample, &mut self.opinion_distribution);
             self.interaction_count += 1;
         }
     }
@@ -120,14 +119,13 @@ impl Simulation {
         for chosen_agent in self.agents.iter_mut() {
             let sample = old_agents
                 .choose_multiple(rng, self.j as usize)
-                .cloned()
                 .collect::<Vec<_>>();
-            chosen_agent.update(&sample, &mut self.opinion_distribution);
+            chosen_agent.update(sample, &mut self.opinion_distribution);
         }
         self.interaction_count += 1;
     }
 
-    pub fn calculate_entropy(&mut self) {
+    fn calculate_entropy(&mut self) {
         let opinion_percentages = self
             .opinion_distribution
             .map
