@@ -12,7 +12,7 @@ pub mod config;
 mod error;
 mod opinion_distribution;
 
-#[derive(Clone, Debug, Deserialize, Serialize, ValueEnum)]
+#[derive(Clone, Debug, Deserialize, Serialize, ValueEnum, PartialEq)]
 pub enum Model {
     Gossip,
     Population,
@@ -24,6 +24,16 @@ impl std::fmt::Display for Model {
             Model::Gossip => write!(f, "gossip"),
             Model::Population => write!(f, "population"),
         }
+    }
+}
+
+impl PartialEq for Simulation {
+    fn eq(&self, other: &Self) -> bool {
+        self.n == other.n
+            && self.j == other.j
+            && self.k == other.k
+            && self.config == other.config
+            && self.model == other.model
     }
 }
 

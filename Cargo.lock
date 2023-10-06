@@ -2387,6 +2387,7 @@ dependencies = [
  "common",
  "console",
  "indicatif",
+ "itertools",
  "serde_json",
  "simulation",
 ]

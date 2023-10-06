@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{create_dir_all, read_to_string, File};
 use std::io::Write;
 use std::path::Path;
@@ -12,6 +13,7 @@ use console::style;
 use indicatif::HumanDuration;
 
 use args::{get_simulation_config, Args};
+use itertools::Itertools;
 use simulation::config::Config;
 use simulation::Simulation;
 
@@ -73,7 +75,7 @@ fn main() -> Result<()> {
         "{} {} Ran {} simulations in {}",
         style("[4/4]").bold().dim(),
         CHECKMARK,
-        simulation_batch_count * 20,
+        simulation_batch_count * args.batch_size as u64,
         HumanDuration(started.elapsed())
     );
     Ok(())
@@ -117,22 +119,81 @@ fn run_simulations(
 /// file already exists, read previously ran simulations first.
 fn export_simulations(args: &Args, simulations: &Arc<Mutex<Vec<Simulation>>>) -> Result<()> {
     let mut simulations = simulations.lock().unwrap();
+    let mut all_simulations = vec![];
     let path = format!("output/{}/simulation.json", args.output);
 
     // If a file already exists, read previous simulations
     if Path::new(&path).exists() {
-        let mut previous_simulations: Vec<Simulation> =
-            serde_json::from_str(&read_to_string(&path)?)?;
-        simulations.append(&mut previous_simulations);
+        all_simulations = serde_json::from_str(&read_to_string(&path)?)?;
     } else {
         let dir_path = format!("output/{}", args.output);
         create_dir_all(dir_path)?;
     };
+    all_simulations.append(&mut simulations);
+
+    let averaged_simulations = average_simulations(all_simulations);
 
     // Create a fresh file and store previous and new simulations in JSON format
     let mut file = File::create(&path)?;
-    let export = serde_json::to_string_pretty(&simulations.clone())?;
+    let export = serde_json::to_string_pretty(&averaged_simulations)?;
     file.write_all(export.as_bytes())?;
 
     Ok(())
+}
+
+/// # Average simulations
+///
+/// Groups all simulations by configuration and averages the interaction count as well
+/// as the entropy. Simulations with the same configuration are summarized into one
+/// Simulation struct.
+fn average_simulations(simulations: Vec<Simulation>) -> Vec<Simulation> {
+    // Group simulations by PartialEq of Simulation
+    let mut grouped_simulations = simulations
+        .into_iter()
+        .group_by(|simulation| simulation.clone())
+        .into_iter()
+        .map(|(simulation, group)| {
+            (
+                simulation,
+                group.collect::<Vec<_>>().into_iter().collect_vec(),
+            )
+        })
+        .collect_vec();
+
+    grouped_simulations
+        .iter_mut()
+        .for_each(|(simulation, group)| {
+            // Calculate the average interaction count of the group
+            simulation.interaction_count = group
+                .iter_mut()
+                .map(|simulation| simulation.interaction_count)
+                .sum::<u64>()
+                / group.len() as u64;
+
+            // Calculate the average entropy of the group
+            let mut averaged_entropy = HashMap::new();
+            simulation
+                .entropy
+                .iter()
+                .for_each(|(interaction, entropy)| {
+                    averaged_entropy
+                        .entry(*interaction)
+                        .and_modify(|v| *v += entropy)
+                        .or_insert(*entropy);
+                });
+
+            averaged_entropy.iter_mut().for_each(|(_, v)| {
+                *v /= group.len() as f64;
+            });
+
+            simulation.entropy = averaged_entropy
+                .into_iter()
+                .map(|(key, value)| (key, value))
+                .collect_vec();
+        });
+
+    grouped_simulations
+        .into_iter()
+        .map(|(simulation, _)| simulation)
+        .collect_vec()
 }
