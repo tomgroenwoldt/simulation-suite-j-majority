@@ -18,7 +18,8 @@ render-triangle:
 	cargo run --release --bin export -- -i output/triangle/simulation.json triangle --generate-latex
 
 k-plot: build-release
-	./target/release/simulation_runner --total-k 25 --total-j 12 --model gossip --output k-plot
+	./target/release/simulation_runner --total-k 50 --total-j 12 --batch-size 100 --model gossip --output k-plot
+	./target/release/simulation_runner --total-k 50 --total-j 12 --batch-size 100 --model population --output k-plot
 render-k-plot:
 	cargo run --release --bin export -- -i output/k-plot/simulation.json k --generate-latex
 render-k-plot-with-error-bars:
