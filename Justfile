@@ -26,12 +26,14 @@ render-k-plot-with-error-bars:
 	cargo run --release --bin export -- -i output/k-plot/simulation.json k --generate-latex --error-bars
 
 j-plot: build-release
-	./target/release/simulation_runner --total-k 12 --total-j 25 --batch-size 100 --model gossip --output j-plot
+	./target/release/simulation_runner --total-k 12 --total-j 50 --batch-size 100 --model gossip --output j-plot
+	./target/release/simulation_runner --total-k 12 --total-j 50 --batch-size 100 --model population --output j-plot
 render-j-plot:
 	cargo run --release --bin export -- -i output/j-plot/simulation.json j --generate-latex
 
 n-plot: build-release
-	./target/release/simulation_runner --n 10000 --n-step-size 10000 --total-n 100000 --total-j 12 --batch-size 50 --model population --output n-plot
+	# ./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model population --output n-plot
+	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model gossip --output n-plot
 render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n --generate-latex
 
