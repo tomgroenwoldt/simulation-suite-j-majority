@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use pgfplots::{
     axis::{
-        plot::{color::PredefinedColor, Color, MarkOption, Marker, Plot3D, PlotKey},
+        plot::{color::PredefinedColor, Color, MarkOption, Marker, Plot2D, PlotKey},
         Axis, AxisKey,
     },
     Picture,
@@ -61,10 +61,10 @@ pub fn generate_triangle_plot(simulations: Vec<Simulation>, _error_bars: bool) -
     let mut plots: Vec<pgfplots::axis::plot::Plot> = vec![];
 
     for points in grouped_triangle_points {
-        let mut pgf_plot = Plot3D::new();
+        let mut pgf_plot = Plot2D::new();
         pgf_plot.coordinates = points
             .iter()
-            .map(|point| (point.0[0] as f64, point.0[1] as f64, point.0[2] as f64).into())
+            .map(|point| (point.0[0] as f64, point.0[1] as f64).into())
             .collect_vec();
         pgf_plot.add_key(PlotKey::Type2D(pgfplots::axis::plot::Type2D::OnlyMarks));
         if let Some(point) = points.first() {

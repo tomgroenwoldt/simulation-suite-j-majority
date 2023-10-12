@@ -5,7 +5,6 @@ pub fn map_value_to_color(value: u64, lowest_value: u64, highest_value: u64) -> 
     let num_categories: f64 = 25.0;
 
     // Calculate the value range per category
-    dbg!(highest_value, lowest_value);
     let value_range = (highest_value - lowest_value) as f64 / num_categories;
 
     // Calculate the category index based on the value
