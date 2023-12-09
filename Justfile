@@ -5,7 +5,7 @@ build-release:
 
 triangle: build-release
 	#!/usr/bin/env bash
-	n=100000
+	n=10000
 	for ((i = 0; i <= n; i+=1000)); do
 	  for ((j = 0; j <= n- i; j+=1000)); do
 	    if [[ $((i + j)) -le $n ]]; then
@@ -32,8 +32,8 @@ render-j-plot:
 	cargo run --release --bin export -- -i output/j-plot/simulation.json j --generate-latex
 
 n-plot: build-release
-	# ./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model population --output n-plot
-	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model gossip --output n-plot
+	# ./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model population --output n-plot --k 3
+	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --total-j 12 --batch-size 100 --model gossip --output n-plot --k 3
 render-n-plot:
 	cargo run --release --bin export -- -i output/n-plot/simulation.json n --generate-latex
 
