@@ -51,3 +51,12 @@ entropy-n-plot: build-release
 	./target/release/simulation_runner --n 100000 --n-step-size 100000 --total-n 1000000 --batch-size 50 --model gossip --output entropy-n-plot
 render-entropy-n-plot:
 	cargo run --release --bin export -- -i output/entropy-n-plot/simulation.json entropy-over-n --generate-latex
+
+hands-on-demo-data:
+	cargo run --release --bin simulation_runner -- --k 2 --total-k 5 --j 3 --total-j 6 --batch-size 100 --model population --output hands-on-demo
+hands-on-demo-plot:
+	cargo run --release --bin export -- -i output/hands-on-demo/simulation.json k --generate-latex
+help-runner:
+	cargo run --release --bin simulation_runner -- --help
+help-export:
+	cargo run --release --bin export -- --help
