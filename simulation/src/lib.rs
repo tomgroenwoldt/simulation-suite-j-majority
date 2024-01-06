@@ -55,7 +55,7 @@ pub struct Simulation {
     pub opinion_distribution: OpinionDistribution,
     /// Number of interactions
     pub interaction_count: u64,
-    pub entropy: Vec<(u64, f64)>,
+    // pub entropy: Vec<(u64, f64)>,
     pub model: Model,
 }
 
@@ -83,7 +83,7 @@ impl Simulation {
             config: config.config,
             opinion_distribution,
             interaction_count: 0,
-            entropy: vec![],
+            // entropy: vec![],
             model: config.model,
         })
     }
@@ -95,15 +95,15 @@ impl Simulation {
         match self.model {
             Model::Gossip => {
                 while !self.reached_consensus() {
-                    self.calculate_entropy();
+                    // self.calculate_entropy();
                     self.interact_gossip_model(&mut rng);
                 }
             }
             Model::Population => {
                 while !self.reached_consensus() {
-                    if self.interaction_count % self.n == 0 {
-                        self.calculate_entropy();
-                    }
+                    // if self.interaction_count % self.n == 0 {
+                    //     // self.calculate_entropy();
+                    // }
                     self.interact_population_model(&mut rng);
                 }
             }
@@ -135,21 +135,21 @@ impl Simulation {
         self.interaction_count += 1;
     }
 
-    fn calculate_entropy(&mut self) {
-        let opinion_percentages = self
-            .opinion_distribution
-            .map
-            .values()
-            .map(|agents_with_opinion| *agents_with_opinion as f64 / self.n as f64)
-            .collect::<Vec<f64>>();
-        let mut entropy = 0.0;
-        for percentage in opinion_percentages.into_iter() {
-            if percentage != 0.0 {
-                entropy -= percentage * percentage.log(self.k as f64);
-            }
-        }
-        self.entropy.push((self.interaction_count, entropy));
-    }
+    // fn calculate_entropy(&mut self) {
+    //     let opinion_percentages = self
+    //         .opinion_distribution
+    //         .map
+    //         .values()
+    //         .map(|agents_with_opinion| *agents_with_opinion as f64 / self.n as f64)
+    //         .collect::<Vec<f64>>();
+    //     let mut entropy = 0.0;
+    //     for percentage in opinion_percentages.into_iter() {
+    //         if percentage != 0.0 {
+    //             entropy -= percentage * percentage.log(self.k as f64);
+    //         }
+    //     }
+    //     self.entropy.push((self.interaction_count, entropy));
+    // }
 
     fn reached_consensus(&mut self) -> bool {
         if self.opinion_distribution.check_occurence_with(self.n) {

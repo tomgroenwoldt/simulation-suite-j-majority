@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::{create_dir_all, read_to_string, File};
 use std::io::Write;
 use std::path::Path;
@@ -131,11 +130,11 @@ fn export_simulations(args: &Args, simulations: &Arc<Mutex<Vec<Simulation>>>) ->
     };
     all_simulations.append(&mut simulations);
 
-    let averaged_simulations = average_simulations(all_simulations);
+    // let averaged_simulations = average_simulations(all_simulations);
 
     // Create a fresh file and store previous and new simulations in JSON format
     let mut file = File::create(&path)?;
-    let export = serde_json::to_string_pretty(&averaged_simulations)?;
+    let export = serde_json::to_string_pretty(&all_simulations)?;
     file.write_all(export.as_bytes())?;
 
     Ok(())
@@ -146,7 +145,7 @@ fn export_simulations(args: &Args, simulations: &Arc<Mutex<Vec<Simulation>>>) ->
 /// Groups all simulations by configuration and averages the interaction count as well
 /// as the entropy. Simulations with the same configuration are summarized into one
 /// Simulation struct.
-fn average_simulations(simulations: Vec<Simulation>) -> Vec<Simulation> {
+fn _average_simulations(simulations: Vec<Simulation>) -> Vec<Simulation> {
     // Group simulations by PartialEq of Simulation
     let mut grouped_simulations = simulations
         .into_iter()
@@ -171,25 +170,25 @@ fn average_simulations(simulations: Vec<Simulation>) -> Vec<Simulation> {
                 / group.len() as u64;
 
             // Calculate the average entropy of the group
-            let mut averaged_entropy = HashMap::new();
-            simulation
-                .entropy
-                .iter()
-                .for_each(|(interaction, entropy)| {
-                    averaged_entropy
-                        .entry(*interaction)
-                        .and_modify(|v| *v += entropy)
-                        .or_insert(*entropy);
-                });
+            // let mut averaged_entropy = HashMap::new();
+            // simulation
+            //     .entropy
+            //     .iter()
+            //     .for_each(|(interaction, entropy)| {
+            //         averaged_entropy
+            //             .entry(*interaction)
+            //             .and_modify(|v| *v += entropy)
+            //             .or_insert(*entropy);
+            //     });
 
-            averaged_entropy.iter_mut().for_each(|(_, v)| {
-                *v /= group.len() as f64;
-            });
+            // averaged_entropy.iter_mut().for_each(|(_, v)| {
+            //     *v /= group.len() as f64;
+            // });
 
-            simulation.entropy = averaged_entropy
-                .into_iter()
-                .map(|(key, value)| (key, value))
-                .collect_vec();
+            // simulation.entropy = averaged_entropy
+            //     .into_iter()
+            //     .map(|(key, value)| (key, value))
+            //     .collect_vec();
         });
 
     grouped_simulations
